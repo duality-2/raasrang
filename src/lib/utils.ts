@@ -68,6 +68,7 @@ export function normaliseName(raw: string): string {
   return raw
     .trim()
     .replace(/\s+/g, ' ')
+    .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
