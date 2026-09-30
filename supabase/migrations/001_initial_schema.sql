@@ -3,6 +3,9 @@
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor).
 -- ============================================================
 
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- 1. Organisers allowlist
 --    Only users whose auth.uid() appears here can access passes.
 --    Insert rows via the Supabase dashboard or service-role API.
