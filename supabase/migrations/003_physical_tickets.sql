@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.ticket_batches (
 
 ALTER TABLE public.ticket_batches ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Organisers can view ticket batches" ON public.ticket_batches;
 CREATE POLICY "Organisers can view ticket batches"
   ON public.ticket_batches FOR SELECT
   TO authenticated
@@ -33,6 +34,7 @@ CREATE POLICY "Organisers can view ticket batches"
     EXISTS (SELECT 1 FROM public.organisers WHERE user_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Organisers can insert ticket batches" ON public.ticket_batches;
 CREATE POLICY "Organisers can insert ticket batches"
   ON public.ticket_batches FOR INSERT
   TO authenticated
@@ -164,7 +166,7 @@ BEGIN
   END IF;
 
   -- Validate idempotency key
-  IF p_idempotency_key IS NULL OR pg_catalog.length(pg_catalog.trim(p_idempotency_key)) = 0 THEN
+  IF p_idempotency_key IS NULL OR pg_catalog.length(pg_catalog.btrim(p_idempotency_key)) = 0 THEN
     RETURN pg_catalog.jsonb_build_object(
       'success', false,
       'error', 'Idempotency key is required.'
@@ -172,7 +174,7 @@ BEGIN
   END IF;
 
   -- Validate name
-  IF p_name IS NULL OR pg_catalog.length(pg_catalog.trim(p_name)) = 0 THEN
+  IF p_name IS NULL OR pg_catalog.length(pg_catalog.btrim(p_name)) = 0 THEN
     RETURN pg_catalog.jsonb_build_object(
       'success', false,
       'error', 'Batch name is required.'
@@ -198,7 +200,7 @@ BEGIN
   -- Idempotency check: if key already processed, return existing batch header without creating duplicates
   SELECT id, batch_number, total_count INTO v_batch_id, v_batch_number, v_existing_count
   FROM public.ticket_batches
-  WHERE idempotency_key = pg_catalog.trim(p_idempotency_key);
+  WHERE idempotency_key = pg_catalog.btrim(p_idempotency_key);
 
   IF FOUND THEN
     RETURN pg_catalog.jsonb_build_object(
@@ -213,13 +215,13 @@ BEGIN
   -- Insert Batch Header with concurrent idempotency collision protection
   BEGIN
     INSERT INTO public.ticket_batches (idempotency_key, name, category, total_count, created_by)
-    VALUES (pg_catalog.trim(p_idempotency_key), pg_catalog.trim(p_name), p_category, p_count, v_caller_id)
+    VALUES (pg_catalog.btrim(p_idempotency_key), pg_catalog.btrim(p_name), p_category, p_count, v_caller_id)
     RETURNING id, batch_number INTO v_batch_id, v_batch_number;
   EXCEPTION WHEN unique_violation THEN
     -- Another concurrent transaction with this idempotency key committed just now
     SELECT id, batch_number, total_count INTO v_batch_id, v_batch_number, v_existing_count
     FROM public.ticket_batches
-    WHERE idempotency_key = pg_catalog.trim(p_idempotency_key);
+    WHERE idempotency_key = pg_catalog.btrim(p_idempotency_key);
 
     IF FOUND THEN
       RETURN pg_catalog.jsonb_build_object(
@@ -330,7 +332,7 @@ BEGIN
   IF p_input_type = 'qr' THEN
     SELECT * INTO v_pass
     FROM public.passes
-    WHERE token = pg_catalog.trim(p_input_value)
+    WHERE token = pg_catalog.btrim(p_input_value)
     FOR UPDATE;
   ELSE
     -- Normalise manual code: strip whitespace/hyphens, uppercase
@@ -365,7 +367,7 @@ BEGIN
       'pass', pg_catalog.jsonb_build_object(
         'id', v_pass.id,
         'manual_code', v_pass.manual_code,
-        'name', pg_catalog.coalesce(v_pass.name, 'Unassigned Ticket'),
+        'name', COALESCE(v_pass.name, 'Unassigned Ticket'),
         'category', v_pass.category
       )
     );
@@ -379,7 +381,7 @@ BEGIN
       'pass', pg_catalog.jsonb_build_object(
         'id', v_pass.id,
         'manual_code', v_pass.manual_code,
-        'name', pg_catalog.coalesce(v_pass.name, 'Unassigned Ticket'),
+        'name', COALESCE(v_pass.name, 'Unassigned Ticket'),
         'category', v_pass.category
       )
     );
@@ -398,7 +400,7 @@ BEGIN
     'pass', pg_catalog.jsonb_build_object(
       'id', v_pass.id,
       'manual_code', v_pass.manual_code,
-      'name', pg_catalog.coalesce(v_pass.name, 'Unassigned Ticket'),
+      'name', COALESCE(v_pass.name, 'Unassigned Ticket'),
       'category', v_pass.category
     )
   );
