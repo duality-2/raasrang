@@ -14,7 +14,9 @@ export type DeliveryStatus = 'not_sent' | 'sent' | 'delivered' | 'failed';
 export interface Pass {
   id: string;
   token: string;
-  name: string;
+  manual_code: string;
+  batch_id: string | null;
+  name: string | null;
   category: PassCategory;
   email: string | null;
   phone: string | null;
@@ -26,16 +28,49 @@ export interface Pass {
   delivered_at: string | null;
 }
 
+/** Physical Ticket Batch */
+export interface TicketBatch {
+  id: string;
+  idempotency_key: string;
+  batch_number: number;
+  name: string;
+  category: PassCategory;
+  total_count: number;
+  created_at: string;
+  created_by: string;
+}
+
 /** What the add-attendee form submits */
 export interface CreatePassInput {
-  name: string;
+  name?: string;
   category: PassCategory;
   email?: string;
   phone?: string;
 }
 
-/** Attendee list row — token is deliberately omitted */
+/** Attendee list row — token is deliberately omitted, manual_code can be shown */
 export type PassListItem = Omit<Pass, 'token'>;
+
+export type RedemptionStatus =
+  | 'VALID'
+  | 'ALREADY_USED'
+  | 'INVALID'
+  | 'CANCELLED'
+  | 'UNAUTHORIZED'
+  | 'ERROR';
+
+export interface RedemptionResult {
+  status: RedemptionStatus;
+  message?: string;
+  used_at?: string;
+  method?: 'qr' | 'manual';
+  pass?: {
+    id: string;
+    manual_code?: string;
+    name: string;
+    category: PassCategory;
+  };
+}
 
 export const CATEGORY_LABELS: Record<PassCategory, string> = {
   couple: 'Couple',

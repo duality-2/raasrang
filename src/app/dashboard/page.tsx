@@ -10,7 +10,7 @@ export default async function DashboardPage() {
 
   const { data: passes, error } = await supabase
     .from('passes')
-    .select('id, name, category, email, phone, status, created_at, used_at, created_by, delivery_status, delivered_at')
+    .select('id, name, manual_code, category, email, phone, status, created_at, used_at, created_by, delivery_status, delivered_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -36,18 +36,41 @@ export default async function DashboardPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Attendees</h1>
+          <h1 className="page-title">Attendees & Physical Passes</h1>
           <p className="page-subtitle">Manage passes for RAAS RANG 2026</p>
         </div>
-        <Link href="/dashboard/add" className="btn btn-primary">
-          + Add Attendee
-        </Link>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <Link href="/dashboard/verify" className="btn btn-primary">
+            🔍 Verify Entry
+          </Link>
+          <Link href="/dashboard/batches" className="btn btn-secondary">
+            Ticket Batches
+          </Link>
+          <Link href="/dashboard/add" className="btn btn-secondary">
+            + Add Attendee
+          </Link>
+        </div>
+      </div>
+
+      {/* Prominent Gate Entry Card */}
+      <div className="card gate-entry-callout mb-6">
+        <div className="gate-entry-callout-inner">
+          <div>
+            <div className="gate-callout-title">🎪 Gate Entry Verification</div>
+            <div className="gate-callout-desc">
+              Scan physical ticket QR codes with iPhone camera or enter printed manual codes.
+            </div>
+          </div>
+          <Link href="/dashboard/verify" className="btn btn-primary gate-callout-btn">
+            Open Gate Scanner →
+          </Link>
+        </div>
       </div>
 
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-value">{total}</div>
-          <div className="stat-label">Total</div>
+          <div className="stat-label">Total Passes</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{unused}</div>
@@ -55,7 +78,7 @@ export default async function DashboardPage() {
         </div>
         <div className="stat-card">
           <div className="stat-value">{used}</div>
-          <div className="stat-label">Used</div>
+          <div className="stat-label">Redeemed</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{delivered}</div>

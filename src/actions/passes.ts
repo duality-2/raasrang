@@ -4,21 +4,21 @@ import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { requireOrganiser } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { validatePassInput } from '@/lib/utils';
+import { validatePassInput, generateManualCode } from '@/lib/utils';
 
 export async function createPass(formData: FormData) {
   // 1. Auth + authorisation check
   const { user, authorized } = await requireOrganiser();
-  if (!authorized) {
+  if (!authorized || !user) {
     return { error: 'You are not authorised to create passes.' };
   }
 
   // 2. Extract and validate input
   const input = {
-    name: formData.get('name') as string,
+    name: (formData.get('name') as string) || undefined,
     category: formData.get('category') as string,
-    email: formData.get('email') as string,
-    phone: formData.get('phone') as string,
+    email: (formData.get('email') as string) || undefined,
+    phone: (formData.get('phone') as string) || undefined,
   };
 
   const validation = validatePassInput(input);
@@ -26,38 +26,50 @@ export async function createPass(formData: FormData) {
     return { error: 'Validation failed.', fieldErrors: validation.errors };
   }
 
-  // 3. Generate cryptographically secure token
-  const token = crypto.randomBytes(32).toString('hex');
-
-  // 4. Insert into database via service-role client
-  //    (We use admin client to guarantee the insert works regardless of
-  //     RLS timing issues during the same request.)
   const admin = createAdminClient();
+  const maxAttempts = 5;
+  let attempts = 0;
 
-  const { data, error } = await admin
-    .from('passes')
-    .insert({
-      token,
-      name: validation.data!.name,
-      category: validation.data!.category,
-      email: validation.data!.email,
-      phone: validation.data!.phone,
-      status: 'unused',
-      delivery_status: 'not_sent',
-      created_by: user.id,
-    })
-    .select('id')
-    .single();
+  // 3. Retry loop for collision safety (unique token or manual_code)
+  while (attempts < maxAttempts) {
+    attempts++;
 
-  if (error) {
-    console.error('Pass creation error:', error.message);
-    // Handle unique constraint violation (extremely unlikely with 32-byte random)
-    if (error.code === '23505') {
-      return { error: 'Token collision — please try again.' };
+    // Generate cryptographically secure long token (QR payload)
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Generate human-readable short manual code (XXXX-XXXX)
+    const manual_code = generateManualCode();
+
+    const { data, error } = await admin
+      .from('passes')
+      .insert({
+        token,
+        manual_code,
+        name: validation.data!.name,
+        category: validation.data!.category,
+        email: validation.data!.email,
+        phone: validation.data!.phone,
+        status: 'unused',
+        delivery_status: 'not_sent',
+        created_by: user.id,
+      })
+      .select('id')
+      .single();
+
+    if (!error && data) {
+      revalidatePath('/dashboard');
+      return { success: true, passId: data.id };
     }
+
+    // Unique constraint violation code 23505 (retry with fresh token and code)
+    if (error?.code === '23505') {
+      console.warn(`Pass insert collision on attempt ${attempts}, retrying...`);
+      continue;
+    }
+
+    console.error('Pass creation error:', error?.message);
     return { error: 'Failed to save pass. Please try again.' };
   }
 
-  revalidatePath('/dashboard');
-  return { success: true, passId: data.id };
+  return { error: 'Could not generate a unique pass code. Please try again.' };
 }

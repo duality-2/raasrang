@@ -16,13 +16,15 @@ export default function PassList({ passes }: PassListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const filtered = passes.filter((pass) => {
-    const matchesSearch =
-      !search ||
-      pass.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory =
-      categoryFilter === 'all' || pass.category === categoryFilter;
-    const matchesStatus =
-      statusFilter === 'all' || pass.status === statusFilter;
+    const term = search.toLowerCase();
+    const nameMatch = pass.name ? pass.name.toLowerCase().includes(term) : false;
+    const codeMatch = pass.manual_code ? pass.manual_code.toLowerCase().includes(term) : false;
+    const emailMatch = pass.email ? pass.email.toLowerCase().includes(term) : false;
+    const phoneMatch = pass.phone ? pass.phone.includes(term) : false;
+
+    const matchesSearch = !search || nameMatch || codeMatch || emailMatch || phoneMatch;
+    const matchesCategory = categoryFilter === 'all' || pass.category === categoryFilter;
+    const matchesStatus = statusFilter === 'all' || pass.status === statusFilter;
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
@@ -33,7 +35,7 @@ export default function PassList({ passes }: PassListProps) {
         <input
           type="text"
           className="form-input"
-          placeholder="Search by name…"
+          placeholder="Search by name, manual code, phone, or email…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           aria-label="Search attendees"
@@ -69,7 +71,7 @@ export default function PassList({ passes }: PassListProps) {
       {/* Results count */}
       {search || categoryFilter !== 'all' || statusFilter !== 'all' ? (
         <p className="form-hint mb-4">
-          Showing {filtered.length} of {passes.length} attendees
+          Showing {filtered.length} of {passes.length} passes
         </p>
       ) : null}
 
@@ -78,19 +80,22 @@ export default function PassList({ passes }: PassListProps) {
         <div className="empty-state">
           <div className="empty-state-icon">🎪</div>
           <div className="empty-state-title">
-            {passes.length === 0
-              ? 'No attendees yet'
-              : 'No matches found'}
+            {passes.length === 0 ? 'No passes yet' : 'No matches found'}
           </div>
           <div className="empty-state-text">
             {passes.length === 0
-              ? 'Add your first attendee to get started.'
-              : 'Try adjusting your search or filters.'}
+              ? 'Add an individual attendee or create a ticket batch to get started.'
+              : 'Try adjusting your search query or filters.'}
           </div>
           {passes.length === 0 && (
-            <Link href="/dashboard/add" className="btn btn-primary">
-              + Add Attendee
-            </Link>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link href="/dashboard/add" className="btn btn-primary">
+                + Add Attendee
+              </Link>
+              <Link href="/dashboard/batches/new" className="btn btn-secondary">
+                Create Batch
+              </Link>
+            </div>
           )}
         </div>
       ) : (
@@ -100,7 +105,8 @@ export default function PassList({ passes }: PassListProps) {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
+                  <th>Attendee</th>
+                  <th>Manual Code</th>
                   <th>Category</th>
                   <th>Status</th>
                   <th>Delivery</th>
@@ -111,7 +117,14 @@ export default function PassList({ passes }: PassListProps) {
               <tbody>
                 {filtered.map((pass) => (
                   <tr key={pass.id}>
-                    <td className="table-name">{pass.name}</td>
+                    <td className="table-name">
+                      {pass.name || <span className="text-muted">Unassigned Ticket</span>}
+                    </td>
+                    <td>
+                      <code style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                        {pass.manual_code || '—'}
+                      </code>
+                    </td>
                     <td>
                       <span className={`badge badge-${pass.category}`}>
                         {CATEGORY_LABELS[pass.category as PassCategory]}
@@ -135,7 +148,7 @@ export default function PassList({ passes }: PassListProps) {
                         href={`/dashboard/passes/${pass.id}`}
                         className="table-link"
                       >
-                        View →
+                        View & Print →
                       </Link>
                     </td>
                   </tr>
@@ -154,12 +167,17 @@ export default function PassList({ passes }: PassListProps) {
                 style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
               >
                 <div className="mobile-card-header">
-                  <span className="mobile-card-name">{pass.name}</span>
+                  <span className="mobile-card-name">
+                    {pass.name || 'Unassigned Ticket'}
+                  </span>
                   <span className={`badge badge-${pass.status}`}>
                     {STATUS_LABELS[pass.status as PassStatus]}
                   </span>
                 </div>
                 <div className="mobile-card-meta">
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                    {pass.manual_code}
+                  </span>
                   <span className={`badge badge-${pass.category}`}>
                     {CATEGORY_LABELS[pass.category as PassCategory]}
                   </span>
