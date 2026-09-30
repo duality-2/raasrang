@@ -18,6 +18,8 @@ export default function EntryScanner() {
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const isProcessingRef = useRef(false);
   const isPausedRef = useRef(false);
+  const lastScannedTokenRef = useRef<string | null>(null);
+  const lastScannedTimestampRef = useRef<number>(0);
 
   // Synchronize processing ref
   useEffect(() => {
@@ -37,14 +39,28 @@ export default function EntryScanner() {
     isPausedRef.current = false;
   }, []);
 
-  // Frame detection handler with immediate frame-locking
+  // Frame detection handler with immediate frame-locking and duplicate suppression
   const onScanSuccess = useCallback(async (decodedText: string) => {
     // Guard against simultaneous frames, double-taps, or existing result
     if (isProcessingRef.current || isPausedRef.current) return;
 
+    // Suppress instant accidental re-scan of the exact same pass (e.g. when staff taps "Scan Next"
+    // while camera is still oriented towards the previous attendee's ticket).
+    // Allow any NEW pass immediately, but require at least 8 seconds before re-scanning the identical pass.
+    const now = Date.now();
+    if (
+      decodedText === lastScannedTokenRef.current &&
+      now - lastScannedTimestampRef.current < 8000
+    ) {
+      return;
+    }
+
     isProcessingRef.current = true;
     isPausedRef.current = true;
     setIsProcessing(true);
+
+    lastScannedTokenRef.current = decodedText;
+    lastScannedTimestampRef.current = now;
 
     // Immediately pause scanning video stream to eliminate duplicate frame reads
     try {
@@ -179,15 +195,19 @@ export default function EntryScanner() {
     setManualCode('');
     isProcessingRef.current = false;
 
-    // If on QR tab and scanner was paused, resume it
+    // If on QR tab and scanner was paused, resume it with a brief transition window
     if (activeTab === 'qr' && scannerActive && html5QrCodeRef.current) {
-      try {
-        html5QrCodeRef.current.resume();
-        isPausedRef.current = false;
-      } catch {
-        // If resume failed, re-start camera cleanly
-        startCamera();
-      }
+      setTimeout(() => {
+        try {
+          if (html5QrCodeRef.current) {
+            html5QrCodeRef.current.resume();
+          }
+          isPausedRef.current = false;
+        } catch {
+          // If resume failed, re-start camera cleanly
+          startCamera();
+        }
+      }, 300);
     }
   };
 
