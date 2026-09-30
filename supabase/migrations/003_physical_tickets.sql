@@ -210,10 +210,32 @@ BEGIN
     );
   END IF;
 
-  -- Insert Batch Header
-  INSERT INTO public.ticket_batches (idempotency_key, name, category, total_count, created_by)
-  VALUES (pg_catalog.trim(p_idempotency_key), pg_catalog.trim(p_name), p_category, p_count, v_caller_id)
-  RETURNING id, batch_number INTO v_batch_id, v_batch_number;
+  -- Insert Batch Header with concurrent idempotency collision protection
+  BEGIN
+    INSERT INTO public.ticket_batches (idempotency_key, name, category, total_count, created_by)
+    VALUES (pg_catalog.trim(p_idempotency_key), pg_catalog.trim(p_name), p_category, p_count, v_caller_id)
+    RETURNING id, batch_number INTO v_batch_id, v_batch_number;
+  EXCEPTION WHEN unique_violation THEN
+    -- Another concurrent transaction with this idempotency key committed just now
+    SELECT id, batch_number, total_count INTO v_batch_id, v_batch_number, v_existing_count
+    FROM public.ticket_batches
+    WHERE idempotency_key = pg_catalog.trim(p_idempotency_key);
+
+    IF FOUND THEN
+      RETURN pg_catalog.jsonb_build_object(
+        'success', true,
+        'batch_id', v_batch_id,
+        'batch_number', v_batch_number,
+        'total_count', v_existing_count,
+        'idempotent_replay', true
+      );
+    ELSE
+      RETURN pg_catalog.jsonb_build_object(
+        'success', false,
+        'error', 'Concurrent batch creation in progress. Please retry.'
+      );
+    END IF;
+  END;
 
   -- Insert tickets atomically
   FOR i IN 1..p_count LOOP
