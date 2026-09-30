@@ -1315,7 +1315,7 @@ h1, h2, h3, h4 {
 }
 
 .mobile-nav-bar {
-  display: flex;
+  display: none;
   width: 100%;
   border-top: 1px solid #3D332A;
   background: #14100E;
@@ -1373,6 +1373,9 @@ h1, h2, h3, h4 {
   }
   .mobile-only {
     display: flex !important;
+  }
+  .mobile-nav-bar {
+    display: flex;
   }
 }
 
