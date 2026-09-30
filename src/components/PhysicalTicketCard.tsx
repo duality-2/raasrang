@@ -10,22 +10,33 @@ interface PhysicalTicketCardProps {
 }
 
 export default function PhysicalTicketCard({ pass, ticketNumber }: PhysicalTicketCardProps) {
-  const displayName = pass.name || 'Unassigned Ticket';
+  const displayName = pass.name || 'Admit One (Unassigned Pass)';
   const categoryLabel = CATEGORY_LABELS[pass.category] || pass.category;
 
   return (
-    <div className="physical-ticket-card">
+    <div className="physical-ticket-card" aria-label={`Physical Ticket: ${displayName}`}>
+      {/* ── Brand Header ── */}
       <div className="ticket-header">
-        <div className="ticket-brand">RAAS RANG 2026</div>
-        <div className="ticket-badge">{categoryLabel.toUpperCase()}</div>
+        <div className="ticket-header-left">
+          <span className="ticket-brand">RAAS RANG 2026</span>
+          <span className="ticket-type-label">OFFICIAL ENTRY PASS</span>
+        </div>
+        <div className="ticket-badge">
+          {categoryLabel.toUpperCase()}
+        </div>
       </div>
 
+      {/* ── Ticket Body (Side-by-side or stacked on mobile) ── */}
       <div className="ticket-body">
+        {/* QR Section */}
         <div className="ticket-qr-section">
-          <QRCodeDisplay payload={pass.token} size={150} />
-          <div className="ticket-scan-hint">Scan at entry gate</div>
+          <div className="ticket-qr-box">
+            <QRCodeDisplay payload={pass.token} size={135} />
+          </div>
+          <span className="ticket-scan-hint">Scan QR at Gate</span>
         </div>
 
+        {/* Ticket Details */}
         <div className="ticket-info-section">
           <div className="ticket-field">
             <span className="ticket-field-label">Attendee</span>
@@ -33,27 +44,34 @@ export default function PhysicalTicketCard({ pass, ticketNumber }: PhysicalTicke
           </div>
 
           <div className="ticket-field">
-            <span className="ticket-field-label">Manual Entry Code</span>
-            <span className="ticket-field-value ticket-manual-code">{pass.manual_code}</span>
-          </div>
-
-          <div className="ticket-field">
-            <span className="ticket-field-label">Status</span>
-            <span className={`ticket-status-pill ${pass.status}`}>
-              {pass.status.toUpperCase()}
+            <span className="ticket-field-label">Gate Manual Code</span>
+            <span className="ticket-field-value ticket-manual-code">
+              {pass.manual_code}
             </span>
           </div>
 
-          {ticketNumber !== undefined && (
-            <div className="ticket-seq-num"># {ticketNumber}</div>
-          )}
+          <div className="ticket-meta-row">
+            <div className="ticket-subfield">
+              <span className="ticket-field-label">Category</span>
+              <span className="ticket-subfield-val">{categoryLabel}</span>
+            </div>
+            {ticketNumber !== undefined && (
+              <div className="ticket-subfield">
+                <span className="ticket-field-label">Seq #</span>
+                <span className="ticket-seq-num">#{ticketNumber}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* ── Ticket Footer ── */}
       <div className="ticket-footer">
         <span>Non-transferable once scanned</span>
         <span>•</span>
-        <span>Physical Pass</span>
+        <span>Valid for one entry only</span>
+        <span>•</span>
+        <span>RAAS RANG 2026</span>
       </div>
     </div>
   );

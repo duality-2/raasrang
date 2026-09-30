@@ -28,6 +28,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
 
   const p = pass as Pass;
   const displayName = p.name || 'Unassigned Ticket';
+  const maskedToken = `${p.token.slice(0, 8)}••••••••••••••••••••••••${p.token.slice(-8)}`;
 
   return (
     <div className="page pass-detail-page">
@@ -55,9 +56,9 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
         {/* Physical Ticket Preview Card */}
         <div className="card mb-6">
           <div className="card-header">
-            <h2 className="card-title">Physical Ticket Card</h2>
+            <h2 className="card-title">Physical Ticket Preview</h2>
             <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Optimised for printing
+              Standard card layout for print
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
@@ -84,9 +85,18 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             </div>
 
             <div className="detail-item">
-              <div className="detail-label">Manual Entry Code</div>
-              <div className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.05em' }}>
+              <div className="detail-label">Gate Manual Code</div>
+              <div className="detail-value" style={{ fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.08em' }}>
                 {p.manual_code || '—'}
+              </div>
+            </div>
+
+            <div className="detail-item">
+              <div className="detail-label">Status</div>
+              <div className="detail-value">
+                <span className={`badge badge-${p.status}`}>
+                  {STATUS_LABELS[p.status as PassStatus]}
+                </span>
               </div>
             </div>
 
@@ -101,15 +111,6 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             </div>
 
             <div className="detail-item">
-              <div className="detail-label">Status</div>
-              <div className="detail-value">
-                <span className={`badge badge-${p.status}`}>
-                  {STATUS_LABELS[p.status as PassStatus]}
-                </span>
-              </div>
-            </div>
-
-            <div className="detail-item">
               <div className="detail-label">Created At</div>
               <div className="detail-value">{formatDate(p.created_at)}</div>
             </div>
@@ -117,33 +118,26 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             <div className="detail-item">
               <div className="detail-label">Used At</div>
               <div className="detail-value">
-                {p.used_at ? formatDate(p.used_at) : '—'}
+                {p.used_at ? formatDate(p.used_at) : 'Not yet redeemed'}
               </div>
             </div>
 
-            {/* Local QR Code */}
+            {/* Local QR Code Display */}
             <div className="detail-item">
-              <div className="detail-label">Local QR Code (Gate Payload)</div>
+              <div className="detail-label">QR Code Payload</div>
               <div style={{ marginTop: '8px' }}>
                 <QRCodeDisplay payload={p.token} size={140} />
               </div>
             </div>
 
-            {/* Secret Token */}
-            <div className="detail-item detail-full-width">
-              <div className="detail-label">QR Token Secret (64-character payload)</div>
-              <div className="detail-token">{p.token}</div>
+            {/* Masked Secret Token */}
+            <div className="detail-item">
+              <div className="detail-label">QR Payload Token (Masked)</div>
+              <code style={{ fontSize: '0.8rem', color: 'var(--muted)', wordBreak: 'break-all' }}>
+                {maskedToken}
+              </code>
             </div>
           </div>
-        </div>
-
-        <div className="card mt-6">
-          <div className="card-header">
-            <div className="card-title">Internal Pass ID (Database UUID)</div>
-          </div>
-          <code style={{ fontSize: '0.8rem', color: 'var(--muted)', wordBreak: 'break-all' }}>
-            {p.id}
-          </code>
         </div>
       </div>
 

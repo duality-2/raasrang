@@ -36,30 +36,53 @@ export default async function BatchPrintPage({ params }: BatchPrintPageProps) {
   }
 
   const passList = passes as Pass[];
+  const isTestBatch = /test|sample|demo/i.test(b.name);
 
   return (
     <div className="batch-print-container">
-      {/* Screen-only controls bar */}
+      {/* ── Screen-only controls bar ── */}
       <div className="no-print print-control-bar">
         <div className="print-control-inner">
-          <div>
+          <div className="print-control-header">
             <Link href={`/dashboard/batches/${b.id}`} className="back-link">
-              ← Back to Batch #{b.batch_number}
+              ← Back to Batch #{b.batch_number} Details
             </Link>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '4px 0 0' }}>
-              Print Run: Batch #{b.batch_number} ({passList.length} Tickets)
-            </h1>
-            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Optimised for physical ticket printing (A4 / Card stock). Each ticket has unique QR & manual code.
+            <div className="print-batch-title-row">
+              <h1 className="print-batch-title">
+                Print Run: Batch #{b.batch_number} — {b.name}
+              </h1>
+              {isTestBatch ? (
+                <span className="badge badge-test" style={{ background: '#451a03', color: '#f59e0b', border: '1px solid #d97706' }}>
+                  🧪 TEST BATCH
+                </span>
+              ) : (
+                <span className="badge badge-live" style={{ background: '#064e3b', color: '#34d399', border: '1px solid #059669' }}>
+                  ✓ OFFICIAL EVENT INVENTORY
+                </span>
+              )}
+            </div>
+            <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+              Contains <strong>{passList.length} physical passes</strong>. Optimised for standard A4 paper (2 tickets per row, clean margins, no clipped QR codes).
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+
+          <div className="print-actions-wrapper">
             <PrintTicketButton />
           </div>
         </div>
+
+        {/* Test Batch Warning Banner */}
+        {isTestBatch && (
+          <div className="alert alert-warning mt-3" style={{ background: '#291807', border: '1px solid #d97706', color: '#fef3c7' }}>
+            <span>⚠</span>
+            <span>
+              <strong>Warning:</strong> This batch is labeled as a TEST RUN ({b.name}). Verify batch details before printing physical event tickets.
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Printable Tickets Grid */}
+      {/* ── Printable Tickets Grid ── */}
       <div className="batch-tickets-sheet">
         {passList.map((pass, index) => (
           <div key={pass.id} className="ticket-print-wrapper">
