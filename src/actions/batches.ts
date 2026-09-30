@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { requireOrganiser } from '@/lib/auth';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { isValidCategory } from '@/lib/utils';
 import type { PassCategory } from '@/types';
 
@@ -32,8 +32,8 @@ export async function createBatch(formData: FormData) {
     return { error: 'Ticket count must be an integer between 1 and 500.' };
   }
 
-  const admin = createAdminClient();
-  const { data, error } = await admin.rpc('create_ticket_batch', {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('create_ticket_batch', {
     p_idempotency_key: idempotencyKey,
     p_name: name,
     p_category: category,
