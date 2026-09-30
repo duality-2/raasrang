@@ -1,144 +1,114 @@
-# RAAS RANG 2026 — Organiser Portal
+# RAAS RANG 2026 — Organiser Portal & Physical Gate System
 
-QR-based event entry system for RAAS RANG 2026. Phase 1: organiser-side web app for managing attendee passes.
+Event entry and physical ticket management system for RAAS RANG 2026. Built with Next.js (App Router), Supabase (PostgreSQL + Auth + SSR), and Vanilla CSS.
 
-## Tech Stack
+---
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript
-- **Auth & Database**: Supabase (Auth + PostgreSQL)
-- **Styling**: Vanilla CSS (festive design system)
-- **Deployment**: Vercel (Phase 2)
+## Key Features
+
+1. **Gate Verification & Entry (`/dashboard/verify`)**:
+   - Single-purpose, mobile-first gate operator interface optimized for iPhone Safari and Android.
+   - Dual-mode verification: **📷 Scan QR** (rear camera preferred) & **⌨ Enter Code** (8-character Crockford Base32 format `XXXX-XXXX`).
+   - Frame-locked scanner: Automatically pauses video stream immediately upon decode to eliminate multi-frame duplicate scans and race conditions.
+   - Binary decision directives:
+     - `ALLOW ENTRY` (Green) — Verified unused pass, atomically redeemed.
+     - `DENY ENTRY — ALREADY USED` (Red) — Pass previously redeemed, displays original check-in timestamp.
+     - `DENY ENTRY — INVALID PASS` (Red) — Ticket not found in event database.
+     - `DENY ENTRY — CANCELLED` (Purple) — Revoked by event organisers.
+     - `DO NOT ADMIT — TIMEOUT / ERROR` (Amber) — Ambiguous network outcome.
+   - Frozen decision display: Requires explicit staff tap on **Scan Next Pass** before resuming camera or allowing next entry.
+
+2. **Physical Ticket Batches (`/dashboard/batches`)**:
+   - Atomic batch generation up to 500 passes per run using hardened PostgreSQL function `create_ticket_batch`.
+   - Generates cryptographically secure 64-character hex QR token (`passes.token`) and human-typable 8-character Crockford Base32 manual code (`passes.manual_code`).
+   - Pre-print physical ticket sheets formatted for A4 card stock (2 columns, avoid page splits, print sequence `#N`).
+   - Clear visual badges distinguishing **🧪 TEST BATCH** from **✓ OFFICIAL EVENT INVENTORY**.
+
+3. **Pass Management & Attendee Directory (`/dashboard`)**:
+   - Real-time statistics: Total Passes, Unused, Redeemed at Gate, Cancelled, and Ticket Batches.
+   - Searchable by name, manual code, phone, or email.
+   - Category and status filters synchronized with URL query params (preserves filter position when navigating back from pass detail).
+   - Clean client pagination (25 items per page).
+
+---
+
+## Security Model
+
+- **Atomic Database Redemption**: `public.redeem_pass(p_input_type, p_input_value)` executes with row-level pessimistic locking (`FOR UPDATE`) inside a `SECURITY DEFINER` function with `SET search_path = ''`.
+- **Zero Public RPC Execution**: `REVOKE ALL ON FUNCTION ... FROM PUBLIC, anon; GRANT EXECUTE ... TO authenticated;`.
+- **Organiser Verification**: The RPC verifies `auth.uid()` against `public.organisers` before checking or locking pass rows.
+- **Session Forwarding**: Next.js Server Actions forward the authenticated user session cookie via `@supabase/ssr` (`await createClient()`), ensuring `auth.uid()` resolves accurately inside PostgreSQL.
+- **Tamper Resistance**: Direct UPDATE privileges on `public.passes` are completely revoked from client roles (`authenticated`, `anon`, `PUBLIC`). Pass status can only transition via the hardened `redeem_pass` function.
+- **Credential Protection**: Raw QR tokens are masked in the UI and never exposed in attendee listings or client-side gate logs.
+
+---
+
+## Gate Operator Ambiguous Timeout Procedure
+
+If a network timeout occurs while scanning a pass at the gate:
+1. **Never assume the ticket is unused.** The atomic database transaction may have committed before the response packet was interrupted.
+2. Direct staff to tap **Scan Next Pass** and re-enter or re-scan the exact same ticket immediately.
+3. If the second attempt returns **`ALREADY USED`** with a timestamp matching the current minute, the pass was successfully registered on the first attempt — admit the attendee.
+4. If it returns an earlier timestamp or continues to fail, hold the attendee and refer to the head supervisor.
+
+---
 
 ## Local Setup
 
-### Prerequisites
+### 1. Prerequisites
+- Node.js 18+ (tested on Node.js 24)
+- A Supabase project with applied migrations:
+  - `001_initial_schema.sql`
+  - `002_fix_organisers_rls.sql`
+  - `003_physical_tickets.sql`
 
-- Node.js 18+
-- A [Supabase](https://supabase.com) project
-
-### 1. Clone & Install
-
+### 2. Install & Configure
 ```bash
 git clone <repo-url>
 cd raasrang
 npm install
-```
-
-### 2. Configure Environment
-
-```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your Supabase credentials:
-
-```
+Configure `.env.local`:
+```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-> ⚠️ **Never commit `.env.local`**. It is in `.gitignore`.
-> The `SUPABASE_SERVICE_ROLE_KEY` is used only server-side. It must never appear in `NEXT_PUBLIC_*` variables, browser code, or logs.
-
-### 3. Apply Database Migration
-
-1. Open the **Supabase Dashboard → SQL Editor**
-2. Copy the contents of `supabase/migrations/001_initial_schema.sql`
-3. Run the SQL
-
-This creates:
-- `organisers` table (allowlist, no browser access)
-- `passes` table (with RLS policies)
-- Required indexes and constraints
-
-> **Note:** If you want the trigram search index, first enable the extension:
-> ```sql
-> CREATE EXTENSION IF NOT EXISTS pg_trgm;
-> ```
-
-### 4. Authorise the First Organiser
-
-1. Start the app and create an account via the sign-in page (Supabase Auth handles user creation).
-   - If your Supabase project does not have "Allow new users to sign up" enabled, create the user in the Supabase Dashboard → Authentication → Users.
-2. Copy the user's UUID from **Supabase Dashboard → Authentication → Users**.
-3. In the **SQL Editor**, run:
-
-```sql
-INSERT INTO public.organisers (user_id) VALUES ('paste-user-uuid-here');
-```
-
-This **cannot** be done from the browser — that's intentional.
-
-### 5. Run Locally
-
+### 3. Run Development Server
 ```bash
 npm run dev
 ```
-
 Open [http://localhost:3000](http://localhost:3000).
 
-## Pages
+---
 
-| Route | Description |
-|---|---|
-| `/login` | Sign in with email & password |
-| `/dashboard` | Attendee list with search, filter, stats |
-| `/dashboard/add` | Add a new attendee + generate pass token |
-| `/dashboard/passes/[id]` | View full pass details including token |
+## Testing & Quality Checks
 
-## Security Model
+Run the automated test suite (Unit & Integration tests):
+```bash
+# Run unit tests only
+npm run test:unit
 
-- **Row Level Security**: The `passes` table has SELECT/INSERT policies that require the authenticated user to be in the `organisers` table.
-- **Organiser allowlist**: The `organisers` table has no browser-accessible RLS policies. Only direct SQL or service-role API can add organisers.
-- **Token generation**: Uses `crypto.randomBytes(32)` (256-bit). Unique constraint on the `token` column.
-- **Token visibility**: Tokens are never exposed in the attendee list. They are shown only in the authorised pass-detail view.
-- **Service role key**: Used only in server actions (`src/actions/passes.ts`, `src/lib/supabase/admin.ts`). Never sent to the browser.
+# Run full suite (Unit + Supabase Integration tests)
+npm test
 
-## Test Steps
+# Run linter
+npm run lint
 
-1. **Unauthenticated access**: Visit `/dashboard` → should redirect to `/login`.
-2. **Sign in**: Enter valid credentials → should redirect to `/dashboard`.
-3. **Non-organiser access**: Sign in with a user NOT in the `organisers` table → should see "Access Denied".
-4. **Add attendee**: Click "+ Add Attendee", fill form, submit → should show success and redirect to pass detail.
-5. **Unique tokens**: Add two attendees → each should have a different token on their detail pages.
-6. **Invalid input**: Submit empty name or invalid email → should show validation errors.
-7. **Search & filter**: Use the search bar and dropdowns on the dashboard.
-8. **Sign out**: Click "Sign Out" → should redirect to `/login`.
-9. **Refresh persistence**: Add an attendee, refresh the page → should still appear.
-
-## Vercel Deployment (Later)
-
-1. Push to GitHub
-2. Import into Vercel
-3. Set the same three environment variables in Vercel's project settings
-4. Deploy
-
-## Future Phases
-
-- QR code generation & delivery (email / WhatsApp)
-- Gate scanner app
-- Google Sheets sync
-- Payment integration
-- Bulk import
-
-## Project Structure
-
+# Run production build
+npm run build
 ```
-src/
-├── actions/           # Server actions (auth, passes)
-├── app/
-│   ├── dashboard/     # Protected organiser pages
-│   ├── login/         # Sign-in page
-│   ├── globals.css    # Design system
-│   ├── layout.tsx     # Root layout
-│   └── page.tsx       # Redirect to /dashboard
-├── components/        # UI components
-├── lib/
-│   ├── supabase/      # Client helpers (browser, server, admin)
-│   ├── auth.ts        # Auth + organiser check helpers
-│   └── utils.ts       # Validation & formatting
-├── middleware.ts       # Auth middleware
-└── types/             # TypeScript types
-```
+
+---
+
+## Deployed Architecture
+
+- **Production URL**: `https://raasrang.vercel.app`
+- **Deployment Repository**: `rishabhk119/raasrang` (branch: `main`)
+- **Upstream Repository**: `duality-2/raasrang` (branch: `main`)
+- **Supabase Authentication**:
+  - Site URL: `https://raasrang.vercel.app`
+  - Redirect URLs: `https://raasrang.vercel.app/**`, `http://localhost:3000/**`
