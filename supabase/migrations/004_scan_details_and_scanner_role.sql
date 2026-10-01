@@ -10,6 +10,44 @@
 -- 1. Ensure required extensions exist
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
+-- 9. Role Resolution Function (Tamper-Proof)
+CREATE OR REPLACE FUNCTION public.get_current_user_role()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_uid UUID;
+  v_role TEXT;
+BEGIN
+  v_uid := auth.uid();
+  IF v_uid IS NULL THEN
+    RETURN 'anon';
+  END IF;
+
+  -- 1. Check organiser allowlist (always Admin)
+  IF EXISTS (SELECT 1 FROM public.organisers WHERE user_id = v_uid) THEN
+    RETURN 'admin';
+  END IF;
+
+  -- 2. Check app_metadata.role from JWT claims (Admin, Scanner, or Ticketer)
+  BEGIN
+    v_role := (current_setting('request.jwt.claims', true)::json->'app_metadata')->>'role';
+    IF v_role IN ('admin', 'scanner', 'ticketer') THEN
+      RETURN v_role;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RETURN 'authenticated';
+  END;
+
+  RETURN 'authenticated';
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_current_user_role() TO authenticated;
+
 -- 2. Event Nights Calendar Table (Configured by Admin — No Guessed Dates)
 CREATE TABLE IF NOT EXISTS public.event_nights (
   id           TEXT PRIMARY KEY, -- e.g. 'night_1', 'night_2', ...
@@ -158,43 +196,6 @@ ALTER TABLE public.ticket_deliveries ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_ticket_deliveries_pass ON public.ticket_deliveries(pass_id);
 CREATE INDEX IF NOT EXISTS idx_ticket_deliveries_status ON public.ticket_deliveries(delivery_status);
 
--- 9. Role Resolution Function (Tamper-Proof)
-CREATE OR REPLACE FUNCTION public.get_current_user_role()
-RETURNS TEXT
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-DECLARE
-  v_uid UUID;
-  v_role TEXT;
-BEGIN
-  v_uid := auth.uid();
-  IF v_uid IS NULL THEN
-    RETURN 'anon';
-  END IF;
-
-  -- 1. Check organiser allowlist (always Admin)
-  IF EXISTS (SELECT 1 FROM public.organisers WHERE user_id = v_uid) THEN
-    RETURN 'admin';
-  END IF;
-
-  -- 2. Check app_metadata.role from JWT claims (Admin, Scanner, or Ticketer)
-  BEGIN
-    v_role := (current_setting('request.jwt.claims', true)::json->'app_metadata')->>'role';
-    IF v_role IN ('admin', 'scanner', 'ticketer') THEN
-      RETURN v_role;
-    END IF;
-  EXCEPTION WHEN OTHERS THEN
-    RETURN 'authenticated';
-  END;
-
-  RETURN 'authenticated';
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.get_current_user_role() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.get_current_user_role() TO authenticated;
 
 -- 10. RLS Hardening: Strict Separation of Concerns
 -- Remove direct table access to ticket credentials for Scanners
