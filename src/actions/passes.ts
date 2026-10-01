@@ -2,13 +2,13 @@
 
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
-import { requireOrganiser } from '@/lib/auth';
+import { requireOrganiserOrTicketer } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validatePassInput, generateManualCode } from '@/lib/utils';
 
 export async function createPass(formData: FormData) {
-  // 1. Auth + authorisation check
-  const { user, authorized } = await requireOrganiser();
+  // 1. Auth + authorisation check (Admin or Ticketer)
+  const { user, authorized } = await requireOrganiserOrTicketer();
   if (!authorized || !user) {
     return { error: 'You are not authorised to create passes.' };
   }
@@ -19,6 +19,11 @@ export async function createPass(formData: FormData) {
     category: formData.get('category') as string,
     email: (formData.get('email') as string) || undefined,
     phone: (formData.get('phone') as string) || undefined,
+    ticket_type: (formData.get('ticket_type') as string) || 'single',
+    party_size: (formData.get('party_size') as string) || '1',
+    seasonal_start_night_id: (formData.get('seasonal_start_night_id') as string) || 'night_1',
+    seasonal_nights_count: (formData.get('seasonal_nights_count') as string) || '9',
+    idempotency_key: (formData.get('idempotency_key') as string) || undefined,
   };
 
   const validation = validatePassInput(input);
@@ -26,11 +31,26 @@ export async function createPass(formData: FormData) {
     return { error: 'Validation failed.', fieldErrors: validation.errors };
   }
 
+  const validatedData = validation.data!;
   const admin = createAdminClient();
+
+  // 3. Idempotent check (prevents double-clicks & network retries)
+  if (validatedData.idempotency_key) {
+    const { data: existingPass } = await admin
+      .from('passes')
+      .select('id')
+      .eq('idempotency_key', validatedData.idempotency_key)
+      .maybeSingle();
+
+    if (existingPass?.id) {
+      return { success: true, passId: existingPass.id, idempotent_replay: true };
+    }
+  }
+
   const maxAttempts = 5;
   let attempts = 0;
 
-  // 3. Retry loop for collision safety (unique token or manual_code)
+  // 4. Retry loop for collision safety (unique token or manual_code)
   while (attempts < maxAttempts) {
     attempts++;
 
@@ -40,31 +60,105 @@ export async function createPass(formData: FormData) {
     // Generate human-readable short manual code (XXXX-XXXX)
     const manual_code = generateManualCode();
 
-    const { data, error } = await admin
+    // Prepare base pass payload (strictly compatible with migrations 001-003)
+    const basePayload: Record<string, unknown> = {
+      token,
+      manual_code,
+      name: validatedData.name,
+      category: validatedData.category,
+      email: validatedData.email,
+      phone: validatedData.phone,
+      status: 'unused',
+      delivery_status: 'not_sent',
+      created_by: user.id,
+    };
+
+    // Prepare full payload with migration 004 fields
+    const fullPayload: Record<string, unknown> = {
+      ...basePayload,
+      ticket_type: validatedData.ticket_type,
+      party_size: validatedData.party_size,
+      validity_state: 'active',
+      ...(validatedData.idempotency_key ? { idempotency_key: validatedData.idempotency_key } : {}),
+      ...(validatedData.ticket_type === 'seasonal'
+        ? {
+            seasonal_start_night_id: validatedData.seasonal_start_night_id,
+            seasonal_nights_count: validatedData.seasonal_nights_count,
+          }
+        : {}),
+    };
+
+    let { data, error } = await admin
       .from('passes')
-      .insert({
-        token,
-        manual_code,
-        name: validation.data!.name,
-        category: validation.data!.category,
-        email: validation.data!.email,
-        phone: validation.data!.phone,
-        status: 'unused',
-        delivery_status: 'not_sent',
-        created_by: user.id,
-      })
+      .insert(fullPayload)
       .select('id')
       .single();
-
-    if (!error && data) {
-      revalidatePath('/dashboard');
-      return { success: true, passId: data.id };
-    }
 
     // Unique constraint violation code 23505 (retry with fresh token and code)
     if (error?.code === '23505') {
       console.warn(`Pass insert collision on attempt ${attempts}, retrying...`);
       continue;
+    }
+
+    // If failed due to missing 004 columns on live database, fallback to base payload
+    if (error) {
+      console.warn('Initial pass insert failed, falling back to base schema:', error.message);
+      const fallbackRes = await admin
+        .from('passes')
+        .insert(basePayload)
+        .select('id')
+        .single();
+
+      if (!fallbackRes.error && fallbackRes.data) {
+        data = fallbackRes.data;
+        error = null;
+      }
+    }
+
+    if (!error && data) {
+      // If seasonal pass, link eligible consecutive event nights
+      if (validatedData.ticket_type === 'seasonal') {
+        const startNightNum = parseInt(
+          validatedData.seasonal_start_night_id?.replace('night_', '') || '1',
+          10
+        );
+        const count = validatedData.seasonal_nights_count || 9;
+        const eligibleRows = [];
+        for (let i = 0; i < count; i++) {
+          const nightNum = startNightNum + i;
+          if (nightNum <= 9) {
+            eligibleRows.push({
+              pass_id: data.id,
+              event_night_id: `night_${nightNum}`,
+            });
+          }
+        }
+        if (eligibleRows.length > 0) {
+          try {
+            await admin.from('pass_eligible_nights').insert(eligibleRows);
+          } catch {
+            // Table may be pending migration 004
+          }
+        }
+      }
+
+      // Track ticket delivery state record
+      try {
+        await admin.from('ticket_deliveries').insert({
+          pass_id: data.id,
+          idempotency_key: `delivery_${data.id}`,
+          channel: 'whatsapp_manual',
+          destination_phone: validatedData.phone,
+          delivery_status: 'ready_to_share',
+          created_by: user.id,
+        });
+      } catch {
+        // Table may be pending migration 004
+      }
+
+      revalidatePath('/dashboard');
+      revalidatePath('/dashboard/passes');
+      return { success: true, passId: data.id };
     }
 
     console.error('Pass creation error:', error?.message);

@@ -1,12 +1,15 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import type { Pass, PassCategory, PassStatus } from '@/types';
-import { CATEGORY_LABELS, STATUS_LABELS } from '@/types';
+import { requireOrganiserOrTicketer } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { Pass, PassStatus } from '@/types';
+import { STATUS_LABELS } from '@/types';
 import { formatDate } from '@/lib/utils';
 import QRCodeDisplay from '@/components/QRCodeDisplay';
 import PrintTicketButton from '@/components/PrintTicketButton';
 import PhysicalTicketCard from '@/components/PhysicalTicketCard';
+import ShareTicketActions from '@/components/ShareTicketActions';
+import { getWhatsAppShareText } from '@/lib/delivery-utils';
 
 interface PassDetailPageProps {
   params: Promise<{ id: string }>;
@@ -14,13 +17,22 @@ interface PassDetailPageProps {
 
 export default async function PassDetailPage({ params }: PassDetailPageProps) {
   const { id } = await params;
-  const supabase = await createClient();
+  const { user, authorized, role } = await requireOrganiserOrTicketer();
+  if (!authorized || !user) {
+    notFound();
+  }
 
-  const { data: pass, error } = await supabase
+  const admin = createAdminClient();
+  let query = admin
     .from('passes')
     .select('*')
-    .eq('id', id)
-    .single();
+    .eq('id', id);
+
+  if (role === 'ticketer') {
+    query = query.eq('created_by', user.id);
+  }
+
+  const { data: pass, error } = await query.maybeSingle();
 
   if (error || !pass) {
     notFound();
@@ -29,12 +41,16 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
   const p = pass as Pass;
   const displayName = p.name || 'Unassigned Ticket';
   const maskedToken = `${p.token.slice(0, 8)}••••••••••••••••••••••••${p.token.slice(-8)}`;
+  const shareText = await getWhatsAppShareText(p);
 
   return (
     <div className="page pass-detail-page">
       <div className="no-print">
-        <Link href="/dashboard" className="back-link">
-          ← Back to attendees
+        <Link
+          href={role === 'ticketer' ? '/dashboard/passes' : '/dashboard'}
+          className="back-link"
+        >
+          {role === 'ticketer' ? '← Back to My Issued Tickets' : '← Back to attendees'}
         </Link>
 
         <div className="page-header">
@@ -42,13 +58,11 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             <h1 className="page-title">{displayName}</h1>
             <p className="page-subtitle">Pass Details & Physical Ticket</p>
           </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span className={`badge badge-${p.category}`}>
-              {CATEGORY_LABELS[p.category as PassCategory]}
-            </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
             <span className={`badge badge-${p.status}`}>
               {STATUS_LABELS[p.status as PassStatus]}
             </span>
+            <ShareTicketActions pass={p} shareText={shareText} />
             <PrintTicketButton />
           </div>
         </div>
@@ -58,7 +72,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
           <div className="card-header">
             <h2 className="card-title">Physical Ticket Preview</h2>
             <span className="text-muted" style={{ fontSize: '0.85rem' }}>
-              Standard card layout for print
+              Standard card layout for print and PDF export
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
@@ -78,11 +92,29 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             </div>
 
             <div className="detail-item">
-              <div className="detail-label">Category</div>
+              <div className="detail-label">Ticket Type</div>
               <div className="detail-value">
-                {CATEGORY_LABELS[p.category as PassCategory]}
+                <span className={p.ticket_type === 'seasonal' ? 'badge-seasonal' : 'badge-single'}>
+                  {p.ticket_type === 'seasonal' ? 'Seasonal Pass' : 'Single Ticket'}
+                </span>
               </div>
             </div>
+
+            <div className="detail-item">
+              <div className="detail-label">Party Size</div>
+              <div className="detail-value" style={{ fontWeight: 700 }}>
+                {p.party_size || 1} Person{(p.party_size || 1) > 1 ? 's' : ''}
+              </div>
+            </div>
+
+            {p.ticket_type === 'seasonal' && (
+              <div className="detail-item">
+                <div className="detail-label">Eligible Nights</div>
+                <div className="detail-value">
+                  {p.seasonal_nights_count ? `${p.seasonal_nights_count} Consecutive Nights` : 'All 9 Nights'}
+                </div>
+              </div>
+            )}
 
             <div className="detail-item">
               <div className="detail-label">Gate Manual Code</div>

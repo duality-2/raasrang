@@ -1,11 +1,28 @@
 import { createClient } from '@/lib/supabase/server';
+import { requireDashboardUser } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { PassListItem } from '@/types';
 import PassList from '@/components/PassList';
+import AccessDenied from '@/components/AccessDenied';
 
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  const { authorized, role } = await requireDashboardUser();
+  if (!authorized || !role) {
+    return <AccessDenied />;
+  }
+
+  // Seamlessly route dedicated staff to their specific portal
+  if (role === 'scanner') {
+    redirect('/dashboard/verify');
+  }
+
+  if (role === 'ticketer') {
+    redirect('/dashboard/add');
+  }
+
   const supabase = await createClient();
 
   // Fetch all passes
@@ -39,8 +56,40 @@ export default async function DashboardPage() {
   const cancelled = passList.filter((p) => p.status === 'cancelled').length;
   const batches = batchCount ?? 0;
 
+  // Fetch event nights configuration status
+  let hasConfiguredNights = false;
+  let nightCount = 0;
+  try {
+    const { data: nights } = await supabase
+      .from('event_nights')
+      .select('id');
+    if (nights && nights.length > 0) {
+      hasConfiguredNights = true;
+      nightCount = nights.length;
+    }
+  } catch {
+    // Migration 004 pending
+  }
+
   return (
     <div className="page">
+      {/* ── Event Nights Schedule Status (if configured) ── */}
+      {hasConfiguredNights && (
+        <div
+          style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            padding: '10px 16px',
+            marginBottom: '16px',
+            fontSize: '0.84rem',
+            color: '#166534',
+          }}
+        >
+          <strong>📅 Event Schedule:</strong> {nightCount} Event Night{nightCount > 1 ? 's' : ''} configured.
+        </div>
+      )}
+
       {/* ── Clear Organiser Actions Hierarchy ── */}
       <div className="dashboard-top-section">
         <div>

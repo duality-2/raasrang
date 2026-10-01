@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBatch } from '@/actions/batches';
-import { CATEGORY_LABELS } from '@/types';
 
 export default function NewBatchPage() {
   const router = useRouter();
@@ -65,7 +64,7 @@ export default function NewBatchPage() {
               name="name"
               type="text"
               className="form-input"
-              placeholder="e.g. VIP Physical Tickets — Box 1"
+              placeholder="e.g. Physical Tickets — Box 1"
               required
               disabled={loading}
               autoFocus
@@ -73,28 +72,7 @@ export default function NewBatchPage() {
             <div className="form-hint">A descriptive label for this print run</div>
           </div>
 
-          <div className="form-group">
-            <label htmlFor="category" className="form-label">
-              Ticket Category<span className="form-required">*</span>
-            </label>
-            <select
-              id="category"
-              name="category"
-              className="form-select"
-              required
-              disabled={loading}
-              defaultValue=""
-            >
-              <option value="" disabled>
-                Select category
-              </option>
-              {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <input type="hidden" name="category" value="complimentary" />
 
           <div className="form-group">
             <label htmlFor="count" className="form-label">

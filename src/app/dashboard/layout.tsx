@@ -1,18 +1,20 @@
-import { requireOrganiser } from '@/lib/auth';
+import { requireDashboardUser } from '@/lib/auth';
 import Header from '@/components/Header';
 import AccessDenied from '@/components/AccessDenied';
+
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, authorized } = await requireOrganiser();
+  const { user, authorized, role } = await requireDashboardUser();
 
-  if (!authorized) {
+  if (!authorized || !role) {
     return (
       <>
-        <Header email={user.email} />
+        <Header email={user.email} userRole={null} />
         <AccessDenied />
       </>
     );
@@ -20,7 +22,7 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <Header email={user.email} />
+      <Header email={user.email} userRole={role} />
       {children}
     </>
   );

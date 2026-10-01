@@ -14,7 +14,10 @@ export async function createBatch(formData: FormData) {
   }
 
   const name = (formData.get('name') as string)?.trim();
-  const category = (formData.get('category') as string)?.trim() as PassCategory;
+  const rawCategory = (formData.get('category') as string)?.trim();
+  const category: PassCategory = rawCategory && isValidCategory(rawCategory)
+    ? (rawCategory as PassCategory)
+    : 'complimentary';
   const countStr = formData.get('count') as string;
   const count = parseInt(countStr, 10);
   const idempotencyKey =
@@ -22,10 +25,6 @@ export async function createBatch(formData: FormData) {
 
   if (!name) {
     return { error: 'Batch name is required and cannot be empty.' };
-  }
-
-  if (!isValidCategory(category)) {
-    return { error: 'Invalid pass category.' };
   }
 
   if (isNaN(count) || count < 1 || count > 500) {

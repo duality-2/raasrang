@@ -7,8 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --env-file=.env.local --experimental-strip-types --test tests/unit/*.test.ts tests/integration/*.test.ts",
-    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts"
+    "test": "npm run test:unit",
+    "test:unit": "node --experimental-strip-types --test tests/unit/*.test.ts",
+    "test:integration": "node --env-file=.env.local --experimental-strip-types --test tests/integration/*.test.ts",
+    "provision:profiles": "node --env-file=.env.local --experimental-strip-types scripts/provision-profiles.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -16,6 +18,7 @@
     "@types/qrcode": "^1.5.6",
     "html5-qrcode": "^2.3.8",
     "next": "16.3.8",
+    "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"

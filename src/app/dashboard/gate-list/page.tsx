@@ -1,37 +1,38 @@
 import Link from 'next/link';
 import { requireOrganiserOrScanner } from '@/lib/auth';
-import EntryScanner from '@/components/EntryScanner';
+import { getPassCounts } from '@/actions/gate-list';
+import GatePassList from '@/components/GatePassList';
 import AccessDenied from '@/components/AccessDenied';
 
 export const dynamic = 'force-dynamic';
 
-export default async function VerifyPage() {
+export default async function GateListPage() {
   const { authorized, role } = await requireOrganiserOrScanner();
 
   if (!authorized || !role) {
     return <AccessDenied />;
   }
 
+  const counts = await getPassCounts();
+
   return (
-    <div className="gate-page-container">
-      {/* Compact Gate Bar */}
+    <div className="gate-page-container gate-list-page">
+      {/* Compact Bar */}
       <div className="gate-top-bar">
         {role === 'organiser' ? (
           <Link href="/dashboard" className="gate-back-btn" aria-label="Back to dashboard">
             ← Dashboard
           </Link>
         ) : (
-          <span className="gate-back-btn-placeholder" />
+          <Link href="/dashboard/verify" className="gate-back-btn" aria-label="Back to scanner">
+            ← Scanner
+          </Link>
         )}
-        <span className="gate-title-badge">🎪 Entry Scanner</span>
-        <Link href="/dashboard/gate-list" className="gate-list-link" aria-label="View pass lists">
-          📋 Lists
-        </Link>
+        <span className="gate-title-badge">📋 Pass Lists</span>
       </div>
 
-      {/* Main Single-Purpose Verification Interface */}
       <main className="gate-main-content">
-        <EntryScanner userRole={role} />
+        <GatePassList initialCounts={counts} userRole={role} />
       </main>
     </div>
   );

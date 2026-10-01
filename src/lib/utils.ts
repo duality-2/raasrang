@@ -101,18 +101,28 @@ export interface ValidationResult {
     category: PassCategory;
     email: string | null;
     phone: string | null;
+    ticket_type: 'single' | 'seasonal';
+    party_size: number;
+    seasonal_start_night_id: string | null;
+    seasonal_nights_count: number | null;
+    idempotency_key: string | null;
   };
 }
 
 /**
  * Server-side validation for pass creation input.
- * Attendee name is optional (null for unassigned physical tickets).
+ * Supports single and seasonal passes, party sizes 1-10, and idempotency keys.
  */
 export function validatePassInput(input: {
   name?: string;
   category?: string;
   email?: string;
   phone?: string;
+  ticket_type?: string;
+  party_size?: number | string;
+  seasonal_start_night_id?: string;
+  seasonal_nights_count?: number | string;
+  idempotency_key?: string;
 }): ValidationResult {
   const errors: Record<string, string> = {};
 
@@ -129,12 +139,46 @@ export function validatePassInput(input: {
     }
   }
 
-  // Category
+  // Ticket Type
+  const rawType = (input.ticket_type ?? 'single').trim().toLowerCase();
+  let ticket_type: 'single' | 'seasonal' = 'single';
+  if (rawType === 'seasonal') {
+    ticket_type = 'seasonal';
+  } else if (rawType !== 'single') {
+    errors.ticket_type = 'Ticket type must be single or seasonal.';
+  }
+
+  // Party Size (1 to 10)
+  const rawPartySize = Number(input.party_size ?? 1);
+  let party_size = 1;
+  if (isNaN(rawPartySize) || rawPartySize < 1 || rawPartySize > 10) {
+    errors.party_size = 'Party size must be between 1 and 10.';
+  } else {
+    party_size = Math.floor(rawPartySize);
+  }
+
+  // Category (optional when generating tickets; safely defaults for database constraint)
+  let category: PassCategory = party_size > 1 ? 'group' : 'complimentary';
   const rawCategory = (input.category ?? '').trim();
-  if (!rawCategory) {
-    errors.category = 'Category is required.';
-  } else if (!isValidCategory(rawCategory)) {
-    errors.category = 'Invalid category.';
+  if (rawCategory) {
+    if (!isValidCategory(rawCategory)) {
+      errors.category = 'Invalid category.';
+    } else {
+      category = rawCategory as PassCategory;
+    }
+  }
+
+  // Seasonal Night Config
+  let seasonal_start_night_id: string | null = null;
+  let seasonal_nights_count: number | null = null;
+  if (ticket_type === 'seasonal') {
+    seasonal_start_night_id = (input.seasonal_start_night_id ?? 'night_1').trim();
+    const rawNightsCount = Number(input.seasonal_nights_count ?? 9);
+    if (isNaN(rawNightsCount) || rawNightsCount < 1 || rawNightsCount > 9) {
+      errors.seasonal_nights_count = 'Seasonal pass nights must be between 1 and 9.';
+    } else {
+      seasonal_nights_count = Math.floor(rawNightsCount);
+    }
   }
 
   // Email (optional)
@@ -159,6 +203,9 @@ export function validatePassInput(input: {
     }
   }
 
+  // Idempotency key (optional)
+  const idempotency_key = (input.idempotency_key ?? '').trim() || null;
+
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };
   }
@@ -168,9 +215,14 @@ export function validatePassInput(input: {
     errors: {},
     data: {
       name,
-      category: rawCategory as PassCategory,
+      category,
       email,
       phone,
+      ticket_type,
+      party_size,
+      seasonal_start_night_id,
+      seasonal_nights_count,
+      idempotency_key,
     },
   };
 }
@@ -186,4 +238,40 @@ export function formatDate(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+export interface PasswordValidationResult {
+  valid: boolean;
+  warnings: string[];
+}
+
+/**
+ * Validates password strength for security-sensitive roles like scanner.
+ * Enforces >= 12 chars, upper, lower, digit, and special char.
+ */
+export function validateScannerPassword(password?: string): PasswordValidationResult {
+  const warnings: string[] = [];
+  if (!password) {
+    return { valid: false, warnings: ['SCANNER_PASSWORD is empty or not set.'] };
+  }
+  if (password.length < 12) {
+    warnings.push(`Password length is ${password.length} characters (minimum required is 12).`);
+  }
+  if (!/[a-z]/.test(password)) {
+    warnings.push('Password must include at least one lowercase character (a-z).');
+  }
+  if (!/[A-Z]/.test(password)) {
+    warnings.push('Password must include at least one uppercase character (A-Z).');
+  }
+  if (!/[0-9]/.test(password)) {
+    warnings.push('Password must include at least one number (0-9).');
+  }
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+    warnings.push('Password must include at least one symbol or special character.');
+  }
+
+  return {
+    valid: warnings.length === 0,
+    warnings,
+  };
 }

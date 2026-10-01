@@ -86,7 +86,7 @@ export default async function BatchPrintPage({ params }: BatchPrintPageProps) {
       <div className="batch-tickets-sheet">
         {passList.map((pass, index) => (
           <div key={pass.id} className="ticket-print-wrapper">
-            <PhysicalTicketCard pass={pass} ticketNumber={index + 1} />
+            <PhysicalTicketCard pass={pass} ticketNumber={index + 1} isTestBatch={isTestBatch} />
           </div>
         ))}
       </div>

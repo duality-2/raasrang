@@ -7,26 +7,30 @@ interface QRCodeDisplayProps {
   payload: string;
   size?: number;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export default function QRCodeDisplay({
   payload,
   size = 200,
   className = '',
+  style,
 }: QRCodeDisplayProps) {
   const [svgUrl, setSvgUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!payload) return;
+    // Generate high-resolution raster for crisp scanning
+    const renderWidth = Math.max(size, 240);
     QRCode.toDataURL(payload, {
-      width: size,
+      width: renderWidth,
       margin: 1,
       color: {
         dark: '#000000',
         light: '#ffffff',
       },
-      errorCorrectionLevel: 'M',
+      errorCorrectionLevel: 'Q',
     })
       .then((url) => setSvgUrl(url))
       .catch((err) => {
@@ -43,7 +47,7 @@ export default function QRCodeDisplay({
     return (
       <div
         className={`qr-loading ${className}`}
-        style={{ width: size, height: size, background: '#f3f4f6', borderRadius: '8px' }}
+        style={{ width: '100%', height: '100%', background: '#f3f4f6', borderRadius: '4px', ...style }}
       />
     );
   }
@@ -53,10 +57,14 @@ export default function QRCodeDisplay({
     <img
       src={svgUrl}
       alt="Pass QR Code"
-      width={size}
-      height={size}
       className={className}
-      style={{ display: 'block', borderRadius: '4px' }}
+      style={{
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        ...style,
+      }}
     />
   );
 }

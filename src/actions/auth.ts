@@ -14,7 +14,7 @@ export async function signIn(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -24,7 +24,15 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/dashboard');
+
+  const role = data.user?.app_metadata?.role;
+  if (role === 'scanner') {
+    redirect('/dashboard/verify');
+  } else if (role === 'ticketer') {
+    redirect('/dashboard/add');
+  } else {
+    redirect('/dashboard');
+  }
 }
 
 export async function signOut() {

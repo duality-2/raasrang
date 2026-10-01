@@ -88,6 +88,23 @@ test('validatePassInput handles both named attendees and unassigned physical tic
   assert.strictEqual(unassigned.data?.name, null);
   assert.strictEqual(unassigned.data?.category, 'vip');
 
+  // Ticket generated without category selection (omitted category)
+  const noCatSingle = validatePassInput({
+    name: 'Julie Saxena',
+    phone: '+919876543210',
+    party_size: 1,
+  });
+  assert.strictEqual(noCatSingle.valid, true);
+  assert.strictEqual(noCatSingle.data?.category, 'complimentary');
+
+  const noCatGroup = validatePassInput({
+    name: 'Sharma Family',
+    phone: '+919876543210',
+    party_size: 5,
+  });
+  assert.strictEqual(noCatGroup.valid, true);
+  assert.strictEqual(noCatGroup.data?.category, 'group');
+
   // Invalid category
   const badCat = validatePassInput({
     category: 'unknown_cat',
