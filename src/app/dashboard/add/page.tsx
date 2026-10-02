@@ -22,6 +22,15 @@ export default function AddAttendeePage() {
   const [partySize, setPartySize] = useState<number>(1);
   const [startNight, setStartNight] = useState<string>('night_1');
   const [nightsCount, setNightsCount] = useState<number>(9);
+  
+  // Phone input state for +91 prefix restriction
+  const [phoneInput, setPhoneInput] = useState('');
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only allow digits, max 10
+    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+    setPhoneInput(val);
+  };
 
   useEffect(() => {
     getEventNights()
@@ -89,14 +98,12 @@ export default function AddAttendeePage() {
       <div className="card" style={{ maxWidth: '640px' }}>
         {error && (
           <div className="alert alert-error">
-            <span>⚠</span>
             <span>{error}</span>
           </div>
         )}
 
         {success && (
           <div className="alert alert-success">
-            <span>✓</span>
             <span>Ticket created successfully! Redirecting to ticket view…</span>
           </div>
         )}
@@ -208,7 +215,7 @@ export default function AddAttendeePage() {
               }}
             >
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.92rem', color: '#6b21a8' }}>
-                📅 Seasonal Pass Validity (All 9 Nights of Navratri)
+                Seasonal Pass Validity (All 9 Nights of Navratri)
               </h4>
 
               <div className="form-row">
@@ -261,6 +268,34 @@ export default function AddAttendeePage() {
             </div>
           )}
 
+          {/* ── 3b. Single Ticket Options ── */}
+          {ticketType === 'single' && (
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label htmlFor="valid_night_id" className="form-label">
+                Select Entry Night<span className="form-required">*</span>
+              </label>
+              <select
+                id="valid_night_id"
+                name="valid_night_id"
+                className="form-select"
+                disabled={loading || success}
+                required
+              >
+                {eventNights.length > 0
+                  ? eventNights.map((night) => (
+                      <option key={night.id} value={night.id}>
+                        {night.title} ({night.event_date})
+                      </option>
+                    ))
+                  : [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <option key={`night_${n}`} value={`night_${n}`}>
+                        Night {n}
+                      </option>
+                    ))}
+              </select>
+            </div>
+          )}
+
           {/* ── 4. Attendee Details ── */}
           <div className="form-group">
             <label htmlFor="name" className="form-label">
@@ -283,16 +318,22 @@ export default function AddAttendeePage() {
               <label htmlFor="phone" className="form-label">
                 WhatsApp Phone Number
               </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                className={`form-input ${fieldErrors.phone ? 'error' : ''}`}
-                placeholder="+919876543210"
-                disabled={loading || success}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1px solid #d1d5db', borderRadius: '6px', padding: '0 12px' }}>
+                <span style={{ color: '#6b7280', fontWeight: 600, marginRight: '8px' }}>+91</span>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  className={`form-input ${fieldErrors.phone ? 'error' : ''}`}
+                  placeholder="9876543210"
+                  disabled={loading || success}
+                  value={phoneInput}
+                  onChange={handlePhoneChange}
+                  style={{ border: 'none', paddingLeft: 0, outline: 'none', flex: 1, boxShadow: 'none' }}
+                />
+              </div>
               {fieldErrors.phone && <div className="form-error">{fieldErrors.phone}</div>}
-              <div className="form-hint">Used for WhatsApp ticket sharing (+91XXXXXXXXXX)</div>
+              <div className="form-hint">Used for WhatsApp ticket sharing</div>
             </div>
 
             <div className="form-group">
@@ -322,7 +363,7 @@ export default function AddAttendeePage() {
                 <span className="spinner" /> Generating Official Ticket…
               </>
             ) : success ? (
-              '✓ Ticket Generated'
+              'Ticket Generated'
             ) : (
               'Issue Ticket & Generate PDF'
             )}

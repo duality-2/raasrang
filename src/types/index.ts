@@ -27,9 +27,6 @@ export type ScanMethod = 'qr' | 'manual';
 
 export type UserRole = 'admin' | 'scanner' | 'ticketer' | 'organiser';
 
-export const ALLOWED_GATES = ['Gate A', 'Gate B', 'Gate C', 'Gate D'] as const;
-export type GateName = (typeof ALLOWED_GATES)[number];
-
 export interface Pass {
   id: string;
   token: string;
@@ -48,6 +45,7 @@ export interface Pass {
   // Multi-person & seasonal fields (migration 004)
   ticket_type?: TicketType;
   party_size?: number;
+  valid_night_id?: string | null;
   seasonal_start_night_id?: string | null;
   seasonal_nights_count?: number | null;
   validity_state?: ValidityState;
@@ -55,7 +53,6 @@ export interface Pass {
   issued_by?: string | null;
   // Scan detail fields
   scanned_by?: string | null;
-  scan_gate?: string | null;
   scan_method?: ScanMethod | null;
 }
 
@@ -95,7 +92,6 @@ export interface Admission {
   pass_id: string;
   event_night_id: string;
   people_count: number;
-  scan_gate: string;
   scan_method: ScanMethod;
   scanned_by: string;
   admitted_at: string;
@@ -110,7 +106,6 @@ export interface AdmissionAttempt {
   rejection_reason: string;
   requested_count: number | null;
   remaining_count: number | null;
-  scan_gate: string | null;
   scan_method: ScanMethod;
   scanned_by: string | null;
   attempted_at: string;
@@ -154,6 +149,7 @@ export interface CreatePassInput {
   phone?: string;
   ticket_type?: TicketType;
   party_size?: number;
+  valid_night_id?: string;
   seasonal_start_night_id?: string;
   seasonal_nights_count?: number;
   idempotency_key?: string;
@@ -162,8 +158,8 @@ export interface CreatePassInput {
 /** Attendee list row — token is deliberately omitted, manual_code can be shown */
 export type PassListItem = Omit<Pass, 'token'>;
 
-/** Gate list row — token always omitted, manual_code may be masked */
-export interface GateListItem {
+/** Entry list row — token always omitted, manual_code may be masked */
+export interface EntryListItem {
   id: string;
   name: string | null;
   category: PassCategory;
@@ -174,10 +170,10 @@ export interface GateListItem {
   manual_code: string;           // masked for scanner role
   status: PassStatus;
   validity_state?: ValidityState;
+  valid_night_id?: string | null;
   created_at: string;
   used_at: string | null;
   scanned_by: string | null;
-  scan_gate: string | null;
   scan_method: ScanMethod | null;
   total_admitted?: number;
   night_admitted?: number;
@@ -202,7 +198,6 @@ export interface RedemptionResult {
   message?: string;
   used_at?: string;
   method?: 'qr' | 'manual';
-  gate?: string | null;
   pass?: {
     id: string;
     manual_code?: string;
@@ -220,6 +215,7 @@ export type AdmissionDecisionStatus =
   | 'TICKET_COMPLETE'
   | 'OUTSIDE_EVENT_WINDOW'
   | 'NIGHT_NOT_INCLUDED'
+  | 'WRONG_DAY'
   | 'NOT_ACTIVATED'
   | 'CANCELLED'
   | 'INVALID'
@@ -232,6 +228,7 @@ export interface TicketPreviewResult {
     | 'CANCELLED'
     | 'OUTSIDE_EVENT_WINDOW'
     | 'NIGHT_NOT_INCLUDED'
+    | 'WRONG_DAY'
     | 'TICKET_COMPLETE'
     | 'NIGHT_FULL'
     | 'INVALID'
@@ -246,6 +243,9 @@ export interface TicketPreviewResult {
   remaining_count?: number;
   event_night_id?: string;
   event_night_title?: string;
+  intended_night?: string;
+  intended_date?: string;
+  current_night?: string;
   message?: string;
 }
 
@@ -255,13 +255,15 @@ export interface AdmitPassResult {
   idempotent_replay?: boolean;
   admitted_now?: number;
   remaining_tonight?: number;
-  gate?: string;
   event_night?: string;
   ticket_type?: TicketType;
   name?: string;
   category?: PassCategory;
   requested_count?: number;
   remaining_count?: number;
+  intended_night?: string;
+  intended_date?: string;
+  current_night?: string;
   message?: string;
   admitted_at?: string;
 }

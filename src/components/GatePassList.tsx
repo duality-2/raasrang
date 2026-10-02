@@ -3,16 +3,16 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { getUsedPasses, getUnusedPasses, getPassCounts } from '@/actions/gate-list';
-import type { GateListItem, PaginationCursor, PassCategory, ScanMethod } from '@/types';
+import type { EntryListItem, PaginationCursor, PassCategory, ScanMethod } from '@/types';
 import { CATEGORY_LABELS } from '@/types';
 import { formatDate } from '@/lib/utils';
 
-import type { GateListCounts, GateListResponse } from '@/actions/gate-list';
+import type { EntryListCounts, EntryListResponse } from '@/actions/gate-list';
 
 type ListTab = 'used' | 'unused';
 
 interface GatePassListProps {
-  initialCounts: GateListCounts;
+  initialCounts: EntryListCounts;
   userRole: import('@/types').UserRole;
 }
 
@@ -27,11 +27,11 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
 
   const [activeTab, setActiveTab] = useState<ListTab>(initialTab);
   const [search, setSearch] = useState(initialSearch);
-  const [counts, setCounts] = useState<GateListCounts>(initialCounts);
+  const [counts, setCounts] = useState<EntryListCounts>(initialCounts);
 
   // Per-tab state
-  const [usedItems, setUsedItems] = useState<GateListItem[]>([]);
-  const [unusedItems, setUnusedItems] = useState<GateListItem[]>([]);
+  const [usedItems, setUsedItems] = useState<EntryListItem[]>([]);
+  const [unusedItems, setUnusedItems] = useState<EntryListItem[]>([]);
   const [usedCursor, setUsedCursor] = useState<PaginationCursor | null>(null);
   const [unusedCursor, setUnusedCursor] = useState<PaginationCursor | null>(null);
   const [usedHasMore, setUsedHasMore] = useState(true);
@@ -66,7 +66,7 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
     setLoading(true);
     try {
       const fetcher = tab === 'used' ? getUsedPasses : getUnusedPasses;
-      const result: GateListResponse = await fetcher(cursor, searchTerm);
+      const result: EntryListResponse = await fetcher(cursor, searchTerm);
 
       if (tab === 'used') {
         setUsedItems(prev => append ? [...prev, ...result.items] : result.items);
@@ -91,7 +91,7 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
     async function loadInitial() {
       try {
         const fetcher = activeTab === 'used' ? getUsedPasses : getUnusedPasses;
-        const result: GateListResponse = await fetcher(null, search);
+        const result: EntryListResponse = await fetcher(null, search);
         if (!ignore) {
           if (activeTab === 'used') {
             setUsedItems(result.items);
@@ -218,14 +218,21 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
           <span className="gate-list-stat-value">{counts.unused}</span>
           <span className="gate-list-stat-label">Unused</span>
         </div>
+        {counts.dailyCounts?.map(day => (
+          <div key={day.title} className="gate-list-stat stat-used" style={{ background: 'var(--slate-50)', borderColor: 'var(--slate)' }}>
+            <span className="gate-list-stat-value" style={{ color: 'var(--slate)' }}>{day.count}</span>
+            <span className="gate-list-stat-label" style={{ color: 'var(--slate)' }}>{day.title}</span>
+          </div>
+        ))}
         <button
           type="button"
           className="btn btn-ghost btn-sm gate-list-refresh-btn"
           onClick={handleRefresh}
           disabled={loading}
           title="Refresh counts"
+          style={{ fontWeight: 600 }}
         >
-          🔄
+          Refresh
         </button>
       </div>
 
@@ -245,8 +252,9 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
             className="clear-search-btn"
             onClick={() => handleSearch('')}
             aria-label="Clear search"
+            style={{ fontWeight: 600 }}
           >
-            ✕
+            Clear
           </button>
         )}
       </div>
@@ -259,8 +267,9 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
           aria-selected={activeTab === 'used'}
           className={`gate-list-tab ${activeTab === 'used' ? 'active' : ''}`}
           onClick={() => handleTabSwitch('used')}
+          style={{ fontWeight: 600 }}
         >
-          ✓ Admitted / Used ({counts.used})
+          Admitted / Used ({counts.used})
         </button>
         <button
           type="button"
@@ -268,8 +277,9 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
           aria-selected={activeTab === 'unused'}
           className={`gate-list-tab ${activeTab === 'unused' ? 'active' : ''}`}
           onClick={() => handleTabSwitch('unused')}
+          style={{ fontWeight: 600 }}
         >
-          ○ Unused ({counts.unused})
+          Unused ({counts.unused})
         </button>
       </div>
 
@@ -328,11 +338,7 @@ export default function GatePassList({ initialCounts, userRole }: GatePassListPr
                     Last Admitted: {formatDate(item.used_at)}
                   </span>
                 )}
-                {item.scan_gate && (
-                  <span className="gate-list-detail">
-                    Gate: {item.scan_gate}
-                  </span>
-                )}
+
                 {item.scan_method && (
                   <span className="gate-list-detail">
                     Method: {(item.scan_method as ScanMethod).toUpperCase()}

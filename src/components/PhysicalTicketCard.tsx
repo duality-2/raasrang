@@ -32,7 +32,7 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
         position: 'relative',
         width: '100%',
         maxWidth: '860px',
-        aspectRatio: '1024 / 382',
+        aspectRatio: '3200 / 1200',
         backgroundImage: 'url(/ticket-bg.png)',
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',
@@ -140,17 +140,16 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#ffffff',
-          borderRadius: '9999px',
+          backgroundColor: 'transparent',
+          borderRadius: '4px',
           boxSizing: 'border-box',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.22)',
         }}
       >
         <span
           className="ticket-manual-code-text"
           style={{
             fontFamily: cfg.manualCode.fontFamily,
-            fontSize: 'clamp(8px, 1.2vw, 12px)',
+            fontSize: 'clamp(10px, 1.5vw, 18px)',
             fontWeight: 900,
             letterSpacing: '0.08em',
             color: '#111827',
@@ -163,28 +162,63 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
         </span>
       </div>
 
+      {/* ── Night / Day Override Overlay ── */}
+      <div
+        className="ticket-day-overlay"
+        style={{
+          position: 'absolute',
+          left: '60.5%', // Shifted a few pixels left
+          top: '48.0%',  // Shifted perfectly between logo and text
+          width: '12%',
+          height: '10%',
+          background: 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10,
+        }}
+      >
+        <span
+          style={{
+            color: '#000000', // Black ink
+            fontWeight: 900,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: 'clamp(15px, 2.2vw, 28px)',
+            letterSpacing: '0.08em',
+          }}
+        >
+          {pass.ticket_type === 'seasonal'
+            ? 'ALL DAYS'
+            : (pass.valid_night_id?.replace('night_', 'DAY ') || 'DAY 1').toUpperCase()}
+        </span>
+      </div>
+
       {/* ── Ticket Entitlement & Attendee Overlay ── */}
       <div
         className="ticket-entitlement-overlay"
         style={{
           position: 'absolute',
-          bottom: '12%',
-          left: '2%',
+          bottom: '22%',
+          left: '1.5%', // Shifted further to the left
+          width: '35%',
+          height: '15%',
+          background: 'transparent',
           zIndex: 10,
           display: 'flex',
           flexDirection: 'column',
-          gap: '3px',
+          justifyContent: 'center',
+          gap: '4px',
           pointerEvents: 'none',
         }}
       >
         {pass.name && (
           <span
             style={{
-              fontSize: 'clamp(7px, 1.1vw, 11px)',
-              fontWeight: 800,
-              color: '#ffffff',
-              textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-              letterSpacing: '0.04em',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: 'clamp(14px, 1.8vw, 22px)', // Increased font size significantly
+              fontWeight: 900,
+              color: '#000000',
+              letterSpacing: '0.05em',
             }}
           >
             ATTENDEE: {pass.name.toUpperCase()}
@@ -195,27 +229,24 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            background: 'rgba(15, 6, 23, 0.85)',
-            border: '1px solid rgba(234, 179, 8, 0.4)',
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: 'clamp(6.5px, 1vw, 10px)',
-            fontWeight: 800,
-            color: '#fef08a',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: 'clamp(12px, 1.5vw, 18px)', // Increased font size significantly
+            fontWeight: 900,
+            color: '#000000',
             letterSpacing: '0.05em',
             textTransform: 'uppercase',
           }}
         >
           <span>{pass.ticket_type === 'seasonal' ? 'SEASONAL PASS' : 'SINGLE TICKET'}</span>
           <span>•</span>
-          <span>PARTY OF {pass.party_size || 1}</span>
+          <span>ADMIT {pass.party_size || 1}</span>
           {pass.ticket_type === 'seasonal' && (
             <>
               <span>•</span>
               <span>
                 {pass.seasonal_nights_count
                   ? `${pass.seasonal_nights_count} NIGHTS`
-                  : 'ALL 9 NIGHTS'}
+                  : '9 NIGHTS'}
               </span>
             </>
           )}

@@ -102,7 +102,7 @@ export const requireAdmin = requireOrganiser;
 
 /**
  * Require auth AND (admin OR scanner) role.
- * Used for gate scanning and gate lists.
+ * Used for scanning and entry lists.
  */
 export async function requireOrganiserOrScanner() {
   const user = await requireAuth();

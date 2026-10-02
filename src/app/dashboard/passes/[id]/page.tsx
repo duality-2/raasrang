@@ -9,7 +9,8 @@ import QRCodeDisplay from '@/components/QRCodeDisplay';
 import PrintTicketButton from '@/components/PrintTicketButton';
 import PhysicalTicketCard from '@/components/PhysicalTicketCard';
 import ShareTicketActions from '@/components/ShareTicketActions';
-import { getWhatsAppShareText } from '@/lib/delivery-utils';
+import { buildTicketMessage } from '@/lib/delivery-utils';
+import { getEventNights } from '@/actions/event-nights';
 
 interface PassDetailPageProps {
   params: Promise<{ id: string }>;
@@ -41,7 +42,13 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
   const p = pass as Pass;
   const displayName = p.name || 'Unassigned Ticket';
   const maskedToken = `${p.token.slice(0, 8)}••••••••••••••••••••••••${p.token.slice(-8)}`;
-  const shareText = await getWhatsAppShareText(p);
+  
+  let night = null;
+  if (p.ticket_type === 'single' && p.valid_night_id) {
+    const nights = await getEventNights();
+    night = nights.find(n => n.id === p.valid_night_id) || null;
+  }
+  const shareText = buildTicketMessage(p, night);
 
   return (
     <div className="page pass-detail-page">

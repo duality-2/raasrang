@@ -11,12 +11,12 @@
 export const TICKET_LAYOUT_CONFIG = {
   /** Ticket aspect ratio and dimensions */
   ticket: {
-    pixelWidth: 1024,
-    pixelHeight: 382,
-    aspectRatio: '1024 / 382',
+    pixelWidth: 3200,
+    pixelHeight: 1200,
+    aspectRatio: '3200 / 1200',
     /** Printable physical dimensions on A4 (fits 3 tickets per sheet comfortably) */
     printWidthMm: 195,
-    printHeightMm: 72.74,
+    printHeightMm: 73.125, // (195 / 2.666)
   },
 
   /**
@@ -24,14 +24,14 @@ export const TICKET_LAYOUT_CONFIG = {
    * Percentage coordinates map 1:1 with the original 1024x382 artwork box.
    */
   qr: {
-    /** Left coordinate as % of ticket width (x = 849px) */
-    leftPercent: 82.91,
-    /** Top coordinate as % of ticket height (y = 188px) */
-    topPercent: 49.21,
-    /** Width as % of ticket width (w = 108px) */
-    widthPercent: 10.55,
-    /** Height as % of ticket height (h = 108px) */
-    heightPercent: 28.27,
+    /** Left coordinate as % of ticket width */
+    leftPercent: 83.5,
+    /** Top coordinate as % of ticket height */
+    topPercent: 55.0,
+    /** Width as % of ticket width */
+    widthPercent: 12.0,
+    /** Height as % of ticket height */
+    heightPercent: 32.0,
     /** Error correction level: Q (25% recovery) */
     errorCorrectionLevel: 'Q' as const,
   },
@@ -41,14 +41,14 @@ export const TICKET_LAYOUT_CONFIG = {
    * Percentage coordinates map 1:1 with the original 1024x382 artwork pill.
    */
   manualCode: {
-    /** Left coordinate as % of ticket width (x = 850px) */
-    leftPercent: 83.01,
-    /** Top coordinate as % of ticket height (y = 298px) */
-    topPercent: 78.01,
-    /** Width as % of ticket width (w = 107px) */
-    widthPercent: 10.45,
-    /** Height as % of ticket height (h = 26px) */
-    heightPercent: 6.81,
+    /** Left coordinate as % of ticket width */
+    leftPercent: 82.5,
+    /** Top coordinate as % of ticket height */
+    topPercent: 88.0,
+    /** Width as % of ticket width */
+    widthPercent: 14.0,
+    /** Height as % of ticket height */
+    heightPercent: 8.0,
     /** Font family for printed code */
     fontFamily: '"SF Mono", "Courier New", Courier, monospace',
   },
@@ -62,8 +62,6 @@ export const TICKET_LAYOUT_CONFIG = {
     cropMarkOffsetMm: 2,
   },
 
-  /** Allowed gates for gate selector */
-  allowedGates: ['Gate A', 'Gate B', 'Gate C', 'Gate D'] as const,
 } as const;
 
 export type TicketLayoutConfig = typeof TICKET_LAYOUT_CONFIG;

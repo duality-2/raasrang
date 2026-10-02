@@ -87,10 +87,11 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Phone validation: digits, optional leading +, 7-15 characters.
+ * Phone validation: 10 digits for Indian mobile numbers.
  */
 export function isValidPhone(phone: string): boolean {
-  return /^\+?\d{7,15}$/.test(phone.replace(/[\s\-()]/g, ''));
+  const digits = phone.replace(/[^0-9]/g, '');
+  return /^[6-9]\d{9}$/.test(digits);
 }
 
 export interface ValidationResult {
@@ -197,9 +198,10 @@ export function validatePassInput(input: {
   let phone: string | null = null;
   if (rawPhone) {
     if (!isValidPhone(rawPhone)) {
-      errors.phone = 'Invalid phone number (7-15 digits, optional leading +).';
+      errors.phone = 'Invalid Indian mobile number (must be 10 digits).';
     } else {
-      phone = rawPhone.replace(/[\s\-()]/g, '');
+      const digits = rawPhone.replace(/[^0-9]/g, '');
+      phone = '+91' + digits; // Normalize to E.164 format
     }
   }
 

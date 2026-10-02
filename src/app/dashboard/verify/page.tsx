@@ -14,7 +14,7 @@ export default async function VerifyPage() {
 
   return (
     <div className="gate-page-container">
-      {/* Compact Gate Bar */}
+      {/* Compact Bar */}
       <div className="gate-top-bar">
         {role === 'organiser' ? (
           <Link href="/dashboard" className="gate-back-btn" aria-label="Back to dashboard">
@@ -23,9 +23,9 @@ export default async function VerifyPage() {
         ) : (
           <span className="gate-back-btn-placeholder" />
         )}
-        <span className="gate-title-badge">🎪 Entry Scanner</span>
+        <span className="gate-title-badge">Entry Scanner</span>
         <Link href="/dashboard/gate-list" className="gate-list-link" aria-label="View pass lists">
-          📋 Lists
+          Lists
         </Link>
       </div>
 

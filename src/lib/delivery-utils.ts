@@ -1,43 +1,105 @@
-import type { Pass } from '../types/index.ts';
+import type { Pass, EventNight } from '../types/index.ts';
 
 /**
- * Validates international phone format (+[1-9][0-9]{9,14})
+ * Validates Indian mobile number (10 digits, starts with 6-9).
+ * Always returns E.164 format: +91XXXXXXXXXX
  */
-export function validateInternationalPhone(phone: string): { valid: boolean; formatted: string } {
-  const cleaned = phone.replace(/[^0-9+]/g, '');
-  // Default to +91 (India) if 10 digits entered without country code
-  let formatted = cleaned;
-  if (/^[6-9]\d{9}$/.test(cleaned)) {
-    formatted = '+91' + cleaned;
-  } else if (!formatted.startsWith('+') && formatted.length >= 10) {
-    formatted = '+' + formatted;
+export function validateIndianPhone(raw: string): { valid: boolean; formatted: string; display: string } {
+  // Strip everything that isn't a digit
+  let digits = raw.replace(/[^0-9]/g, '');
+
+  // Remove leading country code if present
+  if (digits.startsWith('91') && digits.length === 12) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('0') && digits.length === 11) {
+    digits = digits.slice(1);
   }
 
-  const isValid = /^\+[1-9]\d{9,14}$/.test(formatted);
-  return { valid: isValid, formatted };
+  const isValid = /^[6-9]\d{9}$/.test(digits);
+  const formatted = '+91' + digits;
+  // Display format: +91 XXXXX XXXXX
+  const display = isValid ? `+91 ${digits.slice(0, 5)} ${digits.slice(5)}` : raw;
+
+  return { valid: isValid, formatted, display };
 }
 
 /**
- * Builds manual WhatsApp sharing text for ticketers (Mode A)
+ * Normalise paste input for the phone field.
+ * Strips +91, 91, 0 prefix and non-digit chars, returns just the 10 digits.
  */
-export function getWhatsAppShareText(pass: Pass): string {
+export function normalisePhoneInput(raw: string): string {
+  let digits = raw.replace(/[^0-9]/g, '');
+  if (digits.startsWith('91') && digits.length === 12) {
+    digits = digits.slice(2);
+  } else if (digits.startsWith('0') && digits.length === 11) {
+    digits = digits.slice(1);
+  }
+  return digits.slice(0, 10);
+}
+
+/**
+ * Build the ordinal suffix for a number (1st, 2nd, 3rd, 4th, …)
+ */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/**
+ * Build a shareable message for a ticket.
+ * Used by WhatsApp, Email, and Copy Message flows.
+ *
+ * NOTE: wa.me links cannot attach files. This is stated in the UI.
+ */
+export function buildTicketMessage(pass: Pass, night?: EventNight | null): string {
   const isSeasonal = pass.ticket_type === 'seasonal';
-  const typeLabel = isSeasonal ? 'Seasonal Pass' : 'Single Ticket';
-  const partyLabel = `${pass.party_size || 1} Person${(pass.party_size || 1) > 1 ? 's' : ''}`;
-  const nightsLabel = isSeasonal
-    ? `\n*Eligible Nights:* ${pass.seasonal_nights_count ? `${pass.seasonal_nights_count} Nights` : 'All 9 Nights'}`
-    : '';
+
+  let dateLabel: string;
+  if (isSeasonal) {
+    dateLabel = '*Dates:* All 9 Nights of Navratri (See ticket)';
+  } else if (night) {
+    const d = new Date(night.event_date + 'T00:00:00+05:30');
+    const month = d.toLocaleDateString('en-IN', { month: 'long' });
+    dateLabel = `*Date:* ${ordinal(d.getDate())} ${month}`;
+  } else {
+    dateLabel = '*Date:* See ticket for details';
+  }
 
   return (
-    `🎉 *RAAS RANG 2026 — ENTRY TICKET*\n\n` +
-    `*Attendee:* ${pass.name || 'Admit One'}\n` +
-    `*Ticket Type:* ${typeLabel}\n` +
-    `*Party Allowance:* ${partyLabel}${nightsLabel}\n` +
-    `*Gate Entry Code:* ${pass.manual_code}\n\n` +
-    `📍 *Venue:* Surat Dandiya Ground, Vesu\n` +
-    `⏰ *Time:* 6:00 PM to 6:00 AM IST\n\n` +
-    `Attach the official PDF ticket sent with this message. Please present the QR code or printed code at Gate A/B/C/D for entry.`
+    `Thank you for booking your pass for RAAS RANG 2026!\n\n` +
+    `Your ticket PDF is attached below.\n` +
+    `Please keep it safely saved on your phone and present the QR code at the entry.\n\n` +
+    `${dateLabel}\n` +
+    `*Time:* 6 PM onwards\n` +
+    `*Venue:* Mangeshi Banquet, Near Skydeck, Kalyan (West)\n\n` +
+    `Important:\n` +
+    `• Please carry the ticket/QR code for entry.\n` +
+    `• One ticket is valid for the number of persons mentioned at the time of booking.\n` +
+    `• Please do not share your ticket publicly.\n\n` +
+    `*Get ready to experience the colours, music & energy of RAAS RANG!*\n\n` +
+    `*See you there!* — Team RAAS RANG.`
   );
+}
+
+/**
+ * Build a WhatsApp deep link (wa.me).
+ * NOTE: wa.me links cannot attach PDF files. The UI shows an attach hint.
+ * @param phone E.164 format +91XXXXXXXXXX
+ * @param message Pre-formatted message text
+ */
+export function buildWhatsAppUrl(phone: string, message: string): string {
+  // wa.me requires number without '+' prefix
+  const waNumber = phone.startsWith('+') ? phone.slice(1) : phone;
+  return `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Build a mailto: link with subject and body.
+ */
+export function buildEmailUrl(recipientEmail: string, pass: Pass, message: string): string {
+  const subject = `RAAS RANG 2026 — Your Entry Ticket (${pass.manual_code})`;
+  return `mailto:${recipientEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
 }
 
 /**

@@ -23,6 +23,7 @@ export async function createPass(formData: FormData) {
     party_size: (formData.get('party_size') as string) || '1',
     seasonal_start_night_id: (formData.get('seasonal_start_night_id') as string) || 'night_1',
     seasonal_nights_count: (formData.get('seasonal_nights_count') as string) || '9',
+    valid_night_id: (formData.get('valid_night_id') as string) || undefined,
     idempotency_key: (formData.get('idempotency_key') as string) || undefined,
   };
 
@@ -85,7 +86,9 @@ export async function createPass(formData: FormData) {
             seasonal_start_night_id: validatedData.seasonal_start_night_id,
             seasonal_nights_count: validatedData.seasonal_nights_count,
           }
-        : {}),
+        : {
+            valid_night_id: validatedData.valid_night_id || 'night_1',
+          }),
     };
 
     let { data, error } = await admin

@@ -110,12 +110,13 @@ export async function previewTicketAction(
  * Authoritative Atomic Pass Admission (Phase C: Admit N)
  * Locks the pass row in PostgreSQL, checks event night and remaining count,
  * records admission append-only, and guarantees idempotency.
+ *
+ * NOTE: No gate parameter. All scanner devices are equivalent entry points.
  */
 export async function admitPassAction(
   inputType: 'qr' | 'manual',
   inputValue: string,
   peopleCount: number,
-  scanGate: string,
   clientRequestId: string
 ): Promise<AdmitPassResult> {
   const { user, authorized } = await requireOrganiserOrScanner();
@@ -154,14 +155,13 @@ export async function admitPassAction(
       p_input_type: inputType,
       p_input_value: cleanValue,
       p_people_count: peopleCount,
-      p_scan_gate: scanGate,
       p_client_request_id: clientRequestId.trim(),
     });
 
     if (error) {
       // If 004 RPC not yet applied, fallback to legacy redeem_pass
       if (error.code === 'PGRST202' || error.message.includes('does not exist')) {
-        return await legacyRedeemFallback(inputType, cleanValue, scanGate);
+        return await legacyRedeemFallback(inputType, cleanValue);
       }
       console.error('Admit pass RPC error:', error.message);
       return {
@@ -187,15 +187,13 @@ export async function admitPassAction(
  */
 export async function redeemPassAction(
   inputType: 'qr' | 'manual',
-  inputValue: string,
-  scanGate?: string
+  inputValue: string
 ): Promise<RedemptionResult> {
   const requestId = 'req_' + crypto.randomUUID();
   const res = await admitPassAction(
     inputType,
     inputValue,
     1,
-    scanGate || 'Gate A',
     requestId
   );
 
@@ -212,7 +210,6 @@ export async function redeemPassAction(
     status,
     message: res.message,
     used_at: res.admitted_at,
-    gate: res.gate,
     pass: res.name
       ? {
           id: res.admission_id || '',
@@ -287,11 +284,11 @@ async function previewTicketFallback(
 
 /**
  * Legacy redemption fallback when migration 004 is not yet applied
+ * NOTE: No gate parameter.
  */
 async function legacyRedeemFallback(
   inputType: 'qr' | 'manual',
-  cleanValue: string,
-  scanGate: string
+  cleanValue: string
 ): Promise<AdmitPassResult> {
   const { createAdminClient } = await import('@/lib/supabase/admin');
   const admin = createAdminClient();
@@ -358,7 +355,6 @@ async function legacyRedeemFallback(
     status: 'ADMIT_N',
     admitted_now: 1,
     remaining_tonight: 0,
-    gate: scanGate,
     name: updated.name || 'Unassigned Ticket',
     category: updated.category,
     ticket_type: 'single',

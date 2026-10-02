@@ -60,13 +60,13 @@ export default function Header({ email, userRole }: HeaderProps) {
                 href="/dashboard/verify"
                 className={`nav-link ${pathname === '/dashboard/verify' ? 'active' : ''}`}
               >
-                🎪 Gate Scanner
+                🎪 Scanner
               </Link>
               <Link
                 href="/dashboard/gate-list"
                 className={`nav-link ${pathname === '/dashboard/gate-list' ? 'active' : ''}`}
               >
-                📋 Pass Lists
+                📋 Entry Lists
               </Link>
             </>
           )}
@@ -94,13 +94,13 @@ export default function Header({ email, userRole }: HeaderProps) {
                 href="/dashboard/verify"
                 className={`nav-link ${pathname === '/dashboard/verify' ? 'active' : ''}`}
               >
-                🎪 Gate Scanner
+                🎪 Scanner
               </Link>
               <Link
                 href="/dashboard/gate-list"
                 className={`nav-link ${pathname === '/dashboard/gate-list' ? 'active' : ''}`}
               >
-                📋 Pass Lists
+                📋 Entry Lists
               </Link>
             </>
           )}
@@ -113,7 +113,7 @@ export default function Header({ email, userRole }: HeaderProps) {
               href="/dashboard/verify"
               className={`btn btn-primary btn-sm verify-nav-btn ${pathname === '/dashboard/verify' ? 'active' : ''}`}
             >
-              ⚡ Gate Scanner
+              ⚡ Scanner
             </Link>
           )}
           {isTicketer && (

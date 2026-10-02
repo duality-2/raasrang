@@ -2,19 +2,25 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOrganiserOrScanner } from '@/lib/auth';
-import type { GateListItem, PaginationCursor } from '@/types';
+import type { EntryListItem, PaginationCursor } from '@/types';
 
 const PAGE_SIZE = 50;
 
-export interface GateListCounts {
+export interface DailyCount {
+  title: string;
+  count: number;
+}
+
+export interface EntryListCounts {
   total: number;
   used: number;
   unused: number;
   peopleAdmittedTonight?: number;
+  dailyCounts?: DailyCount[];
 }
 
-export interface GateListResponse {
-  items: GateListItem[];
+export interface EntryListResponse {
+  items: EntryListItem[];
   nextCursor: PaginationCursor | null;
   hasMore: boolean;
 }
@@ -22,7 +28,7 @@ export interface GateListResponse {
 /**
  * Fetch counts from real Supabase queries (distinguishing tickets from people admitted tonight).
  */
-export async function getPassCounts(): Promise<GateListCounts> {
+export async function getPassCounts(): Promise<EntryListCounts> {
   const { authorized } = await requireOrganiserOrScanner();
   if (!authorized) {
     return { total: 0, used: 0, unused: 0, peopleAdmittedTonight: 0 };
@@ -37,7 +43,28 @@ export async function getPassCounts(): Promise<GateListCounts> {
   ]);
 
   let peopleCount = usedRes.count ?? 0;
+  let dailyCounts: DailyCount[] = [];
   try {
+    // Fetch all event nights
+    const { data: nights } = await supabase
+      .from('event_nights')
+      .select('id, title')
+      .order('night_number', { ascending: true });
+
+    // Fetch all admissions to aggregate per day
+    const { data: allAdmissions } = await supabase
+      .from('admissions')
+      .select('event_night_id, people_count');
+
+    if (nights && allAdmissions) {
+      dailyCounts = nights.map(night => {
+        const count = allAdmissions
+          .filter(a => a.event_night_id === night.id)
+          .reduce((sum, row) => sum + (row.people_count || 1), 0);
+        return { title: night.title, count };
+      });
+    }
+
     // Attempt counting total people admitted tonight from admissions table
     const { data: admissionsData } = await supabase
       .from('admissions')
@@ -56,6 +83,7 @@ export async function getPassCounts(): Promise<GateListCounts> {
     used: usedRes.count ?? 0,
     unused: unusedRes.count ?? 0,
     peopleAdmittedTonight: peopleCount,
+    dailyCounts,
   };
 }
 
@@ -76,7 +104,7 @@ function maskManualCode(code: string): string {
 export async function getUsedPasses(
   cursor: PaginationCursor | null,
   search: string = ''
-): Promise<GateListResponse> {
+): Promise<EntryListResponse> {
   const { authorized, role } = await requireOrganiserOrScanner();
   if (!authorized) {
     return { items: [], nextCursor: null, hasMore: false };
@@ -117,7 +145,7 @@ export async function getUsedPasses(
   const hasMore = data.length > PAGE_SIZE;
   const rows = hasMore ? data.slice(0, PAGE_SIZE) : data;
 
-  const items: GateListItem[] = rows.map((row) => ({
+  const items: EntryListItem[] = rows.map((row) => ({
     id: row.id,
     name: row.name,
     category: row.category,
@@ -128,10 +156,10 @@ export async function getUsedPasses(
     manual_code: isScanner ? maskManualCode(row.manual_code) : row.manual_code,
     status: row.status,
     validity_state: row.validity_state || 'active',
+    valid_night_id: row.valid_night_id || null,
     created_at: row.created_at,
     used_at: row.used_at,
     scanned_by: row.scanned_by,
-    scan_gate: row.scan_gate,
     scan_method: row.scan_method,
   }));
 
@@ -151,7 +179,7 @@ export async function getUsedPasses(
 export async function getUnusedPasses(
   cursor: PaginationCursor | null,
   search: string = ''
-): Promise<GateListResponse> {
+): Promise<EntryListResponse> {
   const { authorized, role } = await requireOrganiserOrScanner();
   if (!authorized) {
     return { items: [], nextCursor: null, hasMore: false };
@@ -191,7 +219,7 @@ export async function getUnusedPasses(
   const hasMore = data.length > PAGE_SIZE;
   const rows = hasMore ? data.slice(0, PAGE_SIZE) : data;
 
-  const items: GateListItem[] = rows.map((row) => ({
+  const items: EntryListItem[] = rows.map((row) => ({
     id: row.id,
     name: row.name,
     category: row.category,
@@ -202,10 +230,10 @@ export async function getUnusedPasses(
     manual_code: isScanner ? maskManualCode(row.manual_code) : row.manual_code,
     status: row.status,
     validity_state: row.validity_state || 'active',
+    valid_night_id: row.valid_night_id || null,
     created_at: row.created_at,
     used_at: row.used_at,
     scanned_by: row.scanned_by,
-    scan_gate: row.scan_gate,
     scan_method: row.scan_method,
   }));
 

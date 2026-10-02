@@ -20,9 +20,9 @@ import { TICKET_LAYOUT_CONFIG } from './ticket-config.ts';
 export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
-  // Printable dimensions: 552.75 pt x 206.18 pt (aspect ratio 2.68:1)
+  // Printable dimensions: 552.75 pt x 207.28 pt (aspect ratio 2.666:1)
   const widthPt = 552.75;
-  const heightPt = 206.18;
+  const heightPt = 207.28;
   const page = pdfDoc.addPage([widthPt, heightPt]);
 
   // Load and embed background event artwork
@@ -82,14 +82,7 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
   const codeW = widthPt * (cfg.manualCode.widthPercent / 100);
   const codeH = heightPt * (cfg.manualCode.heightPercent / 100);
 
-  // Draw white rounded pill
-  page.drawRectangle({
-    x: codeX,
-    y: codeY,
-    width: codeW,
-    height: codeH,
-    color: rgb(1, 1, 1),
-  });
+  // No background needed for manual code on clean background
 
   // Printed manual code
   const manualCodeText = pass.manual_code;
@@ -107,44 +100,57 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
   // Ticket entitlement overlays
   const isSeasonal = pass.ticket_type === 'seasonal';
   const typeText = isSeasonal ? 'SEASONAL PASS' : 'SINGLE TICKET';
-  const partySizeText = `PARTY OF ${pass.party_size || 1}`;
+  const partySizeText = `ADMIT ${pass.party_size || 1}`;
   const nightsText = isSeasonal
     ? pass.seasonal_nights_count
       ? `${pass.seasonal_nights_count} NIGHTS`
-      : 'ALL 9 NIGHTS'
+      : '9 NIGHTS'
     : '';
 
-  const badgeText = [typeText, partySizeText, nightsText].filter(Boolean).join('  •  ');
-  const badgeWidth = fontHelveticaBold.widthOfTextAtSize(badgeText, 7.5) + 12;
+  const badgeText = [typeText, partySizeText, nightsText].filter(Boolean).join(' • ');
+  const badgeWidth = widthPt * 0.18;
+  const badgeHeight = heightPt * 0.13;
+  const badgeX = widthPt * 0.025; // Shifted further to the left
+  const badgeY = heightPt * 0.12;
 
-  // Dark translucent pill for entitlement
-  page.drawRectangle({
-    x: widthPt * 0.02,
-    y: heightPt * 0.14,
-    width: badgeWidth,
-    height: 14,
-    color: rgb(0.1, 0.04, 0.15),
-    opacity: 0.85,
-  });
-
-  page.drawText(badgeText, {
-    x: widthPt * 0.02 + 6,
-    y: heightPt * 0.14 + 3.5,
-    size: 7.5,
-    font: fontHelveticaBold,
-    color: rgb(0.98, 0.82, 0.28), // Golden accent
-  });
-
+  // Cover background removed - transparent for clean layout
+  
   if (pass.name) {
     const attendeeText = `ATTENDEE: ${pass.name.toUpperCase()}`;
     page.drawText(attendeeText, {
-      x: widthPt * 0.02,
-      y: heightPt * 0.23,
-      size: 7.5,
+      x: badgeX,
+      y: badgeY + 16,
+      size: 13, // Increased font size
       font: fontHelveticaBold,
-      color: rgb(1, 1, 1),
+      color: rgb(0, 0, 0), // Solid black
     });
   }
+
+  page.drawText(badgeText, {
+    x: badgeX,
+    y: badgeY,
+    size: 11, // Increased font size
+    font: fontHelveticaBold,
+    color: rgb(0, 0, 0), // Solid black
+  });
+
+  // Day Override Badge (Covers DAY - 1 baked-in text)
+  const dayText = pass.ticket_type === 'seasonal'
+    ? 'ALL DAYS'
+    : (pass.valid_night_id?.replace('night_', 'DAY ') || 'DAY 1').toUpperCase();
+    
+  const dayTextWidth = fontHelveticaBold.widthOfTextAtSize(dayText, 18);
+  const dayBadgeX = widthPt * 0.605 - (dayTextWidth / 2); // Shifted slightly left under Nexora logo
+  const dayBadgeY = heightPt * 0.45; // Perfectly positioned above text
+
+  // Text inside Day badge
+  page.drawText(dayText, {
+    x: dayBadgeX,
+    y: dayBadgeY,
+    size: 18,
+    font: fontHelveticaBold,
+    color: rgb(0, 0, 0), // Solid black
+  });
 
   // TEST Watermark (only for test passes)
   if (isTest) {

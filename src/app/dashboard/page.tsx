@@ -99,7 +99,7 @@ export default async function DashboardPage() {
 
         <div className="dashboard-action-group">
           <Link href="/dashboard/verify" className="btn btn-primary dashboard-verify-btn">
-            🎪 Open Gate Scanner
+            Open Scanner
           </Link>
           <Link href="/dashboard/add" className="btn btn-secondary">
             + New Attendee
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: 'var(--saffron)' }}>{used}</div>
-          <div className="stat-label">Redeemed at Gate</div>
+          <div className="stat-label">Redeemed</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: 'var(--slate)' }}>{cancelled}</div>

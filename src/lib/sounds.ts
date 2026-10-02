@@ -1,5 +1,5 @@
 /**
- * Web Audio API sound synthesis for gate scanner.
+ * Web Audio API sound synthesis for entry scanner.
  * No audio files — all sounds generated programmatically.
  *
  * PASS:   Bright rising two-note chime (C5 → E5), sine wave
@@ -11,9 +11,6 @@ export type ScanSound = 'pass' | 'reject';
 
 /** Mute state key for localStorage */
 export const MUTE_STORAGE_KEY = 'raasrang_scanner_muted';
-
-/** Gate choice key for localStorage */
-export const GATE_STORAGE_KEY = 'raasrang_scanner_gate';
 
 /**
  * Play the PASS chime: rising C5 → E5 sine tones.
@@ -142,20 +139,4 @@ export function isMuted(): boolean {
 export function setMuted(muted: boolean): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(MUTE_STORAGE_KEY, muted ? 'true' : 'false');
-}
-
-/**
- * Get the stored gate choice from localStorage.
- */
-export function getStoredGate(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(GATE_STORAGE_KEY);
-}
-
-/**
- * Save the gate choice to localStorage.
- */
-export function setStoredGate(gate: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(GATE_STORAGE_KEY, gate);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Pass } from '@/types';
 import { recordManualShareAction } from '@/actions/delivery';
 
@@ -16,6 +16,11 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
   const [isConfirming, setIsConfirming] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   // Clean phone number for WhatsApp link
   const rawPhone = pass.phone?.replace(/[^0-9]/g, '') || '';
@@ -23,39 +28,59 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
     ? `https://wa.me/${rawPhone}?text=${encodeURIComponent(shareText)}`
     : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
-  // Mobile Web Share API with PDF file
+  // Mobile Web Share API with PDF attachment
   const handleDeviceShare = async () => {
-    setShareFeedback(null);
+    setShareFeedback('Preparing PDF for sharing...');
     try {
       if (typeof navigator !== 'undefined' && navigator.share) {
-        // Fetch private PDF stream
-        const response = await fetch(`/api/passes/${pass.id}/pdf`);
-        if (!response.ok) {
-          throw new Error('Failed to retrieve PDF stream');
-        }
-        const blob = await response.blob();
-        const fileName = `RAAS_RANG_Ticket_${pass.manual_code}.pdf`;
-        const file = new File([blob], fileName, { type: 'application/pdf' });
+        // Fetch PDF blob
+        const res = await fetch(`/api/tickets/${pass.id}/pdf`);
+        const blob = await res.blob();
+        const file = new File([blob], `RaasRang-Ticket-${pass.manual_code}.pdf`, { type: 'application/pdf' });
+        
+        const shareData = {
+          title: 'RAAS RANG 2026 — Official Ticket',
+          text: shareText,
+        };
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: 'RAAS RANG 2026 — Official Ticket',
-            text: shareText,
-            files: [file],
-          });
-          setShareFeedback('Shared via device sheet. Please tap "Confirm Sent" once sent.');
-          return;
+          await navigator.share({ ...shareData, files: [file] });
+        } else {
+          await navigator.share(shareData);
         }
+        
+        setShareFeedback('Shared via device sheet. Please tap "Mark as Sent" once sent.');
+        return;
       }
-      // If Web Share API with files is not supported (e.g. desktop)
       setShowInstructions(true);
-      window.open(`/api/passes/${pass.id}/pdf`, '_blank');
-      window.open(waUrl, '_blank');
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== 'AbortError') {
         setShowInstructions(true);
       }
+      setShareFeedback(null);
     }
+  };
+
+  const handleWhatsAppClick = () => {
+    // The link opens wa.me in a new tab natively via href.
+    setShareFeedback('WhatsApp opened! Please note: you must attach the PDF manually on desktop.');
+  };
+
+  const handleCopyMessage = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        setShareFeedback('✓ Message copied to clipboard!');
+      }
+    } catch {
+      setShareFeedback('Failed to copy message.');
+    }
+  };
+
+  const handleEmailShare = () => {
+    const subject = encodeURIComponent('RAAS RANG 2026 — Official Ticket');
+    const body = encodeURIComponent(shareText);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   // Explicit Human Confirmation: Ticketer explicitly marks ticket as delivered
@@ -81,50 +106,57 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
   return (
     <div className="share-ticket-actions no-print" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-        {/* 📥 1. Direct PDF Download */}
-        <a
-          href={`/api/passes/${pass.id}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-secondary btn-sm"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-        >
-          <span>📥</span>
-          <span>Download PDF</span>
-        </a>
-
-        {/* 📱 2. Device Share (Attaches actual PDF file on mobile) */}
-        <button
-          type="button"
-          onClick={handleDeviceShare}
-          className="btn btn-primary btn-sm"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: '#25D366',
-            borderColor: '#25D366',
-            color: '#ffffff',
-          }}
-        >
-          <span>💬</span>
-          <span>Share PDF via WhatsApp</span>
-        </button>
-
-        {/* 💬 3. Open WhatsApp Web / Chat (Never marks as sent) */}
+        
+        {/* Open WhatsApp Web / Chat */}
         <a
           href={waUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn btn-secondary btn-sm"
-          onClick={() => setShowInstructions(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          onClick={handleWhatsAppClick}
+          className="btn btn-primary btn-sm fw-bold"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontWeight: 600,
+          }}
         >
-          <span>🔗</span>
-          <span>Open Chat</span>
+          <span>Open WhatsApp</span>
         </a>
 
-        {/* 4. Delivery Status Badge */}
+        {/* Copy Message */}
+        <button
+          type="button"
+          onClick={handleCopyMessage}
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+        >
+          <span>Copy Message</span>
+        </button>
+
+        {/* Share via Email */}
+        <button
+          type="button"
+          onClick={handleEmailShare}
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+        >
+          <span>Share via Email</span>
+        </button>
+
+        {/* Device Native Share */}
+        {hasMounted && typeof navigator !== 'undefined' && navigator.share && (
+          <button
+            type="button"
+            onClick={handleDeviceShare}
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+          >
+            <span>Share with PDF...</span>
+          </button>
+        )}
+
+        {/* Delivery Status Badge */}
         <span
           className={`badge badge-${deliveryStatus}`}
           style={{
@@ -136,11 +168,11 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
             fontWeight: 600,
           }}
         >
-          {isAlreadySent ? '✓ MANUALLY SHARED' : '⏳ READY TO SHARE'}
+          {isAlreadySent ? 'MANUALLY SHARED' : 'READY TO SHARE'}
         </span>
       </div>
 
-      {/* 5. Human Explicit Confirmation Button */}
+      {/* Human Explicit Confirmation Button */}
       {!isAlreadySent && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <button
@@ -156,33 +188,8 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
               fontWeight: 600,
             }}
           >
-            {isConfirming ? 'Recording…' : '✓ Mark as Sent (Confirm Human Delivery)'}
+            {isConfirming ? 'Recording…' : 'Mark as Sent'}
           </button>
-          <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>
-            Tap after you have attached the PDF and sent it in WhatsApp.
-          </span>
-        </div>
-      )}
-
-      {/* Step-by-step Manual Attach Guide for Desktop */}
-      {showInstructions && (
-        <div
-          style={{
-            background: '#fffbeb',
-            border: '1px solid #fef3c7',
-            padding: '10px 14px',
-            borderRadius: '6px',
-            fontSize: '0.82rem',
-            color: '#92400e',
-          }}
-        >
-          <strong>💡 Manual WhatsApp Attachment Instructions:</strong>
-          <ol style={{ margin: '6px 0 0 18px', padding: 0 }}>
-            <li>Download the official PDF ticket above.</li>
-            <li>In the opened WhatsApp chat, tap the <strong>+ / Paperclip</strong> icon.</li>
-            <li>Select <strong>Document</strong> &rarr; choose the downloaded PDF.</li>
-            <li>Tap <strong>Send</strong>, then click <strong>&quot;Mark as Sent&quot;</strong> below.</li>
-          </ol>
         </div>
       )}
 
@@ -191,26 +198,6 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
           {shareFeedback}
         </div>
       )}
-
-      {/* 6. Automated WhatsApp Cloud API Status Notice */}
-      <div
-        style={{
-          marginTop: '4px',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          background: '#f3f4f6',
-          border: '1px solid #e5e7eb',
-          fontSize: '0.78rem',
-          color: '#4b5563',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span>
-          🤖 <strong>Automated WhatsApp API:</strong> <span style={{ color: '#dc2626', fontWeight: 700 }}>BLOCKED</span> (Awaiting Meta Business account, approved template & webhook setup)
-        </span>
-      </div>
     </div>
   );
 }

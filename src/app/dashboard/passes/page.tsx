@@ -46,7 +46,7 @@ export default async function IssuedPassesPage() {
 
         <div className="dashboard-action-group">
           <Link href="/dashboard/add" className="btn btn-primary">
-            🎟️ Issue New Ticket
+            Issue New Ticket
           </Link>
         </div>
       </div>
@@ -60,7 +60,7 @@ export default async function IssuedPassesPage() {
 
       {passList.length === 0 ? (
         <div className="card empty-state" style={{ textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🎟️</div>
+          <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>Tickets</div>
           <h3>No tickets issued yet</h3>
           <p style={{ color: '#6b7280', margin: '8px 0 20px' }}>
             {isTicketer
@@ -79,7 +79,7 @@ export default async function IssuedPassesPage() {
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
                   <th style={{ padding: '12px 16px' }}>Attendee</th>
                   <th style={{ padding: '12px 16px' }}>Type & Party</th>
-                  <th style={{ padding: '12px 16px' }}>Gate Code</th>
+                  <th style={{ padding: '12px 16px' }}>Entry Code</th>
                   <th style={{ padding: '12px 16px' }}>Status</th>
                   <th style={{ padding: '12px 16px' }}>Delivery</th>
                   <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
@@ -96,7 +96,7 @@ export default async function IssuedPassesPage() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                        {pass.ticket_type === 'seasonal' ? '🗓️ Seasonal' : '🎫 Single'}
+                        {pass.ticket_type === 'seasonal' ? 'Seasonal' : 'Single'}
                       </span>
                       <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         Party of {pass.party_size || 1}
@@ -107,7 +107,7 @@ export default async function IssuedPassesPage() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span className={`badge badge-${pass.status}`} style={{ fontSize: '0.75rem' }}>
-                        {pass.status === 'used' ? '✓ Used' : 'Unused'}
+                        {pass.status === 'used' ? 'Used' : 'Unused'}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px' }}>

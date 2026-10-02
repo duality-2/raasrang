@@ -28,7 +28,7 @@ export default async function GateListPage() {
             ← Scanner
           </Link>
         )}
-        <span className="gate-title-badge">📋 Pass Lists</span>
+        <span className="gate-title-badge">Entry Lists</span>
       </div>
 
       <main className="gate-main-content">

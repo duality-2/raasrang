@@ -7,17 +7,14 @@ import type {
   TicketPreviewResult,
   AdmitPassResult,
   PassCategory,
-  GateName,
 } from '@/types';
-import { CATEGORY_LABELS, ALLOWED_GATES } from '@/types';
+import { CATEGORY_LABELS } from '@/types';
 import { formatDate } from '@/lib/utils';
 import {
   playPassSound,
   playRejectSound,
   isMuted,
   setMuted as storeMuted,
-  getStoredGate,
-  setStoredGate,
 } from '@/lib/sounds';
 
 interface EntryScannerProps {
@@ -30,10 +27,6 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingLabel, setProcessingLabel] = useState('Verifying ticket…');
 
-  // Gate selector state
-  const [selectedGate, setSelectedGate] = useState<string>('');
-  const [showGateSelector, setShowGateSelector] = useState(false);
-
   // Sound state
   const [muted, setMutedState] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -41,7 +34,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
   // Flash state
   const [flashColor, setFlashColor] = useState<'green' | 'red' | null>(null);
 
-  // Two-step Gate Flow State
+  // Two-step Flow State
   const [preview, setPreview] = useState<TicketPreviewResult | null>(null);
   const [selectedCount, setSelectedCount] = useState<number | null>(null);
   const [admissionResult, setAdmissionResult] = useState<AdmitPassResult | null>(null);
@@ -64,15 +57,9 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     isProcessingRef.current = isProcessing;
   }, [isProcessing]);
 
-  // Initialize gate from localStorage and check if we need gate selector
+  // Initialize mute state from localStorage
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      const stored = getStoredGate();
-      if (stored && ALLOWED_GATES.includes(stored as GateName)) {
-        setSelectedGate(stored);
-      } else {
-        setShowGateSelector(true);
-      }
       setMutedState(isMuted());
     });
     mountedRef.current = true;
@@ -133,13 +120,16 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
         if (!mountedRef.current) return;
 
         if (previewRes.status !== 'VALID') {
-          // Denied on preview (e.g. CANCELLED, OUTSIDE_EVENT_WINDOW, NIGHT_NOT_INCLUDED, TICKET_COMPLETE, NIGHT_FULL, INVALID, UNAUTHORIZED)
+          // Denied on preview
           setAdmissionResult({
             status: previewRes.status,
             name: previewRes.name,
             category: previewRes.category,
             ticket_type: previewRes.ticket_type,
             remaining_count: previewRes.remaining_count ?? 0,
+            intended_night: previewRes.intended_night,
+            intended_date: previewRes.intended_date,
+            current_night: previewRes.current_night,
             message: previewRes.message,
           });
           triggerFlash('red');
@@ -177,6 +167,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
   );
 
   // ── Step 2: Authoritative Atomic Admission ──
+  // NOTE: No gate parameter. All scanner devices are equivalent entry points.
   const handleConfirmAdmission = async () => {
     if (!currentInputRef.current || !selectedCount || isProcessingRef.current) return;
 
@@ -195,7 +186,6 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
         currentInputRef.current.type,
         currentInputRef.current.value,
         selectedCount,
-        selectedGate || 'Gate A',
         clientRequestId
       );
 
@@ -326,12 +316,10 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     }
   }, [onScanSuccess, ensureAudioContext]);
 
-  // Auto-start camera when QR tab is active and gate is selected
+  // Auto-start camera when QR tab is active
   useEffect(() => {
     if (
       activeTab === 'qr' &&
-      selectedGate &&
-      !showGateSelector &&
       !scannerActive &&
       !preview &&
       !admissionResult
@@ -344,7 +332,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedGate, showGateSelector]);
+  }, [activeTab]);
 
   // Handle tab backgrounding — pause decoder, resume on return
   useEffect(() => {
@@ -397,14 +385,6 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     setCameraError(null);
     setPreview(null);
     setAdmissionResult(null);
-  };
-
-  // Gate selection handler
-  const handleGateSelect = (gate: string) => {
-    setSelectedGate(gate);
-    setStoredGate(gate);
-    setShowGateSelector(false);
-    ensureAudioContext();
   };
 
   // Mute toggle
@@ -464,35 +444,13 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     }
   };
 
-  // ── Gate Selector Screen ──
-  if (showGateSelector) {
-    return (
-      <div className="gate-scanner-shell">
-        <div className="gate-selector-card">
-          <h2 className="gate-selector-title">Select Your Gate</h2>
-          <p className="gate-selector-subtitle">
-            Choose the gate this device is assigned to. This persists for the session.
-          </p>
-          <div className="gate-selector-grid">
-            {ALLOWED_GATES.map((gate) => (
-              <button
-                key={gate}
-                type="button"
-                className="btn btn-primary gate-selector-btn"
-                onClick={() => handleGateSelect(gate)}
-              >
-                {gate}
-              </button>
-            ))}
-          </div>
-          <p className="gate-selector-hint">
-            🔇 iOS may stay silent when the ringer switch is on silent.{' '}
-            <strong>Turn off silent mode</strong> for audible scan alerts.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Build the result headline message for WRONG_DAY status
+  const getWrongDayMessage = (result: AdmitPassResult) => {
+    if (result.intended_night) {
+      return `DO NOT ADMIT — WRONG DAY (ticket is for ${result.intended_night})`;
+    }
+    return 'DO NOT ADMIT — WRONG DAY';
+  };
 
   return (
     <div className="gate-scanner-shell">
@@ -504,18 +462,9 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
       {/* ── Top Controls Bar ── */}
       <div className="gate-controls-bar">
         <div className="gate-controls-left">
-          <span className="gate-active-badge">{selectedGate}</span>
           <span className="badge-scanner" title={`Operating role: ${userRole}`}>
             {userRole === 'scanner' ? 'Scanner' : 'Admin'}
           </span>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => setShowGateSelector(true)}
-            title="Change gate"
-          >
-            ✏️
-          </button>
         </div>
         <div className="gate-controls-right">
           <button
@@ -687,6 +636,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
               'DO NOT ADMIT — EVENT NOT ACTIVE'}
             {admissionResult.status === 'NIGHT_NOT_INCLUDED' &&
               'DO NOT ADMIT — NOT VALID TONIGHT'}
+            {admissionResult.status === 'WRONG_DAY' && getWrongDayMessage(admissionResult)}
             {admissionResult.status === 'CANCELLED' && 'DO NOT ADMIT — TICKET CANCELLED'}
             {admissionResult.status === 'INVALID' && 'DO NOT ADMIT — INVALID TICKET'}
             {admissionResult.status === 'UNAUTHORIZED' && 'DO NOT ADMIT — UNAUTHORISED'}
@@ -696,7 +646,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
           <div className="gate-result-subtext">
             {admissionResult.status === 'ADMIT_N' && (
               <>
-                Pass admitted successfully at {admissionResult.gate}.
+                Pass admitted successfully.
                 {admissionResult.remaining_tonight !== undefined && (
                   <strong> ({admissionResult.remaining_tonight} remaining tonight)</strong>
                 )}
@@ -709,15 +659,22 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
             {admissionResult.status === 'TICKET_COMPLETE' &&
               'All people on this ticket have already entered. Ticket permanently complete.'}
             {admissionResult.status === 'OUTSIDE_EVENT_WINDOW' &&
-              'Gate scanning is only open during scheduled event hours in Asia/Kolkata.'}
+              'Scanning is only open during scheduled event hours in Asia/Kolkata.'}
             {admissionResult.status === 'NIGHT_NOT_INCLUDED' &&
-              'This seasonal ticket is not configured for tonight’s event.'}
+              'This seasonal ticket is not configured for tonight\u2019s event.'}
+            {admissionResult.status === 'WRONG_DAY' && (
+              <>
+                This ticket is for <strong>{admissionResult.intended_night || 'another day'}</strong>
+                {admissionResult.intended_date && ` (${admissionResult.intended_date})`}.
+                {admissionResult.current_night && ` Tonight is ${admissionResult.current_night}.`}
+              </>
+            )}
             {admissionResult.status === 'CANCELLED' &&
               'This ticket has been revoked by event organisers.'}
             {admissionResult.status === 'INVALID' &&
               'Ticket not found in event database. Please verify physical print.'}
             {admissionResult.status === 'UNAUTHORIZED' &&
-              'Current account is not authorised for gate scanning.'}
+              'Current account is not authorised for scanning.'}
             {admissionResult.status === 'ERROR' &&
               'Network timeout or interrupted connection. DO NOT ADMIT until verified with supervisor.'}
           </div>
@@ -809,7 +766,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
                 className="btn btn-primary gate-camera-toggle-btn"
                 disabled={isProcessing}
               >
-                📷 Open Gate Scanner
+                📷 Open Scanner
               </button>
             </div>
           )}
