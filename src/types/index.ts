@@ -54,6 +54,8 @@ export interface Pass {
   // Scan detail fields
   scanned_by?: string | null;
   scan_method?: ScanMethod | null;
+  // Joins
+  event_nights?: { title: string } | null;
 }
 
 /** Physical Ticket Batch */

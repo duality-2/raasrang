@@ -169,7 +169,7 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
           position: 'absolute',
           left: '60.5%', // Shifted a few pixels left
           top: '48.0%',  // Shifted perfectly between logo and text
-          width: '12%',
+          width: '16%',
           height: '10%',
           background: 'transparent',
           display: 'flex',
@@ -188,11 +188,12 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
             fontFamily: 'system-ui, -apple-system, sans-serif',
             fontSize: 'clamp(15px, 2.2vw, 28px)',
             letterSpacing: '0.08em',
+            whiteSpace: 'nowrap',
           }}
         >
           {pass.ticket_type === 'seasonal'
             ? 'ALL DAYS'
-            : (pass.valid_night_id?.replace('night_', 'DAY ') || 'DAY 1').toUpperCase()}
+            : ((pass.event_nights as any)?.title || 'DAY 1').toUpperCase()}
         </span>
       </div>
 

@@ -36,7 +36,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: pass, error: passError } = await admin
     .from('passes')
-    .select('*')
+    .select('*, event_nights!valid_night_id(title)')
     .eq('id', id)
     .single();
 

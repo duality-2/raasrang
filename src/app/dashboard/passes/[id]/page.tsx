@@ -27,7 +27,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
   const admin = createAdminClient();
   let query = admin
     .from('passes')
-    .select('*')
+    .select('*, event_nights!valid_night_id(title)')
     .eq('id', id);
 
   if (role === 'ticketer') {

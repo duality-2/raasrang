@@ -135,7 +135,7 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
   // Day Override Badge (Covers DAY - 1 baked-in text)
   const dayText = pass.ticket_type === 'seasonal'
     ? 'ALL DAYS'
-    : (pass.valid_night_id?.replace('night_', 'DAY ') || 'DAY 1').toUpperCase();
+    : ((pass.event_nights as any)?.title || 'DAY 1').toUpperCase();
     
   const dayTextWidth = fontHelveticaBold.widthOfTextAtSize(dayText, 18);
   const dayBadgeX = widthPt * 0.605 - (dayTextWidth / 2); // Shifted slightly left under Nexora logo
