@@ -106,6 +106,7 @@ export interface ValidationResult {
     party_size: number;
     seasonal_start_night_id: string | null;
     seasonal_nights_count: number | null;
+    valid_night_id: string | null;
     idempotency_key: string | null;
   };
 }
@@ -123,6 +124,7 @@ export function validatePassInput(input: {
   party_size?: number | string;
   seasonal_start_night_id?: string;
   seasonal_nights_count?: number | string;
+  valid_night_id?: string;
   idempotency_key?: string;
 }): ValidationResult {
   const errors: Record<string, string> = {};
@@ -172,6 +174,8 @@ export function validatePassInput(input: {
   // Seasonal Night Config
   let seasonal_start_night_id: string | null = null;
   let seasonal_nights_count: number | null = null;
+  let valid_night_id: string | null = null;
+
   if (ticket_type === 'seasonal') {
     seasonal_start_night_id = (input.seasonal_start_night_id ?? 'night_1').trim();
     const rawNightsCount = Number(input.seasonal_nights_count ?? 9);
@@ -179,6 +183,18 @@ export function validatePassInput(input: {
       errors.seasonal_nights_count = 'Seasonal pass nights must be between 1 and 9.';
     } else {
       seasonal_nights_count = Math.floor(rawNightsCount);
+    }
+    // Strict requirement: Seasonal passes must NOT inherit valid_night_id
+    valid_night_id = null;
+  } else {
+    // Single Ticket requirement
+    valid_night_id = (input.valid_night_id ?? '').trim();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!valid_night_id) {
+      errors.valid_night_id = 'A valid event night must be selected for a single ticket.';
+    } else if (!uuidRegex.test(valid_night_id) && !valid_night_id.startsWith('night_')) {
+      errors.valid_night_id = 'Invalid event night selection.';
     }
   }
 
@@ -224,6 +240,7 @@ export function validatePassInput(input: {
       party_size,
       seasonal_start_night_id,
       seasonal_nights_count,
+      valid_night_id,
       idempotency_key,
     },
   };

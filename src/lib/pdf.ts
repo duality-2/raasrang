@@ -108,8 +108,6 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
     : '';
 
   const badgeText = [typeText, partySizeText, nightsText].filter(Boolean).join(' • ');
-  const badgeWidth = widthPt * 0.18;
-  const badgeHeight = heightPt * 0.13;
   const badgeX = widthPt * 0.025; // Shifted further to the left
   const badgeY = heightPt * 0.12;
 

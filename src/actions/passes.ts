@@ -85,9 +85,10 @@ export async function createPass(formData: FormData) {
         ? {
             seasonal_start_night_id: validatedData.seasonal_start_night_id,
             seasonal_nights_count: validatedData.seasonal_nights_count,
+            valid_night_id: null,
           }
         : {
-            valid_night_id: validatedData.valid_night_id || 'night_1',
+            valid_night_id: validatedData.valid_night_id,
           }),
     };
 
