@@ -154,7 +154,6 @@ export async function createPass(formData: FormData) {
       return { success: true, passId: data.id };
     }
 
-    console.error('Pass creation error:', error?.message);
     return { error: 'Failed to save pass. Please try again.' };
   }
 
