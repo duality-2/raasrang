@@ -91,6 +91,7 @@ test('Integration: QR first, then Manual code => ALREADY_USED', async () => {
     assert.strictEqual(Boolean(r2.used_at), true);
   } finally {
     if (pass?.id) {
+      await admin.from('admissions').delete().eq('pass_id', pass.id);
       await admin.from('passes').delete().eq('id', pass.id);
     }
   }
@@ -135,6 +136,7 @@ test('Integration: Manual first, then QR code => ALREADY_USED', async () => {
     assert.strictEqual(r2.status, 'ALREADY_USED');
   } finally {
     if (pass?.id) {
+      await admin.from('admissions').delete().eq('pass_id', pass.id);
       await admin.from('passes').delete().eq('id', pass.id);
     }
   }
@@ -173,6 +175,7 @@ test('Integration: Concurrent simultaneous redemption => exactly one VALID', asy
     assert.strictEqual(statuses.filter((s) => s === 'VALID').length, 1);
   } finally {
     if (pass?.id) {
+      await admin.from('admissions').delete().eq('pass_id', pass.id);
       await admin.from('passes').delete().eq('id', pass.id);
     }
   }
@@ -214,6 +217,7 @@ test('Integration: Invalid, Cancelled, and Unauthorised redemption handling', as
     assert.strictEqual(canRes.status, 'CANCELLED');
   } finally {
     if (pass?.id) {
+      await admin.from('admissions').delete().eq('pass_id', pass.id);
       await admin.from('passes').delete().eq('id', pass.id);
     }
   }

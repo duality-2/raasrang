@@ -171,3 +171,67 @@ export async function createPass(formData: FormData) {
 
   return { error: 'Could not generate a unique pass code. Please try again.' };
 }
+
+export async function deletePass(passId: string) {
+  const { user, authorized, role } = await requireOrganiserOrTicketer();
+  if (!authorized || !user) {
+    return { error: 'You are not authorised.' };
+  }
+
+  const admin = createAdminClient();
+
+  if (role === 'ticketer') {
+    const { data: pass } = await admin.from('passes').select('created_by').eq('id', passId).single();
+    if (!pass || pass.created_by !== user.id) return { error: 'You are not authorised.' };
+  }
+
+  const { data: admissions, error: admissionError } = await admin
+    .from('admissions')
+    .select('id')
+    .eq('pass_id', passId)
+    .limit(1);
+
+  if (admissionError && admissionError.code !== '42P01') {
+    return { error: 'Failed to verify admission history.' };
+  }
+
+  if (admissions && admissions.length > 0) {
+    return { error: 'Cannot delete a pass that has admission history. Please cancel or archive it instead.' };
+  }
+
+  const { error } = await admin.from('passes').delete().eq('id', passId);
+  if (error) {
+    if (error.code === '23503') {
+      return { error: 'Cannot delete this pass because it has linked data (e.g. admissions).' };
+    }
+    return { error: 'Failed to delete pass.' };
+  }
+  
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/passes');
+  return { success: true };
+}
+
+export async function cancelPass(passId: string) {
+  const { user, authorized, role } = await requireOrganiserOrTicketer();
+  if (!authorized || !user) {
+    return { error: 'You are not authorised.' };
+  }
+
+  const admin = createAdminClient();
+
+  if (role === 'ticketer') {
+    const { data: pass } = await admin.from('passes').select('created_by').eq('id', passId).single();
+    if (!pass || pass.created_by !== user.id) return { error: 'You are not authorised.' };
+  }
+
+  const { error } = await admin.from('passes').update({ status: 'cancelled' }).eq('id', passId);
+  if (error) {
+    return { error: 'Failed to cancel pass.' };
+  }
+  
+  revalidatePath('/dashboard');
+  revalidatePath('/dashboard/passes');
+  revalidatePath(`/dashboard/passes/${passId}`);
+  return { success: true };
+}

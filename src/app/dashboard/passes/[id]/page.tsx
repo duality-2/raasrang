@@ -9,6 +9,7 @@ import QRCodeDisplay from '@/components/QRCodeDisplay';
 import PrintTicketButton from '@/components/PrintTicketButton';
 import PhysicalTicketCard from '@/components/PhysicalTicketCard';
 import ShareTicketActions from '@/components/ShareTicketActions';
+import PassManagementActions from '@/components/PassManagementActions';
 import { buildTicketMessage } from '@/lib/delivery-utils';
 import { getEventNights } from '@/actions/event-nights';
 
@@ -49,6 +50,13 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
     night = nights.find(n => n.id === p.valid_night_id) || null;
   }
   const shareText = buildTicketMessage(p, night);
+
+  // Check for admission history
+  const { count: admissionCount } = await admin
+    .from('admissions')
+    .select('id', { count: 'exact', head: true })
+    .eq('pass_id', p.id);
+  const hasAdmissions = (admissionCount || 0) > 0;
 
   return (
     <div className="page pass-detail-page">
@@ -177,6 +185,12 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
               </code>
             </div>
           </div>
+
+          <PassManagementActions 
+            passId={p.id} 
+            hasAdmissions={hasAdmissions} 
+            currentStatus={p.status} 
+          />
         </div>
       </div>
 
