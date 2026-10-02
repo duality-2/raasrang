@@ -471,18 +471,25 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     currentInputRef.current = null;
     isProcessingRef.current = false;
 
-    // If on QR tab and scanner was paused, resume promptly without stream recreation
-    if (activeTab === 'qr' && scannerActive && html5QrCodeRef.current) {
+    // Reset last scanned token quickly so new ticket can be scanned immediately
+    setTimeout(() => {
+      lastScannedTokenRef.current = null;
+    }, 400);
+
+    // If on QR tab and scanner was paused, resume promptly without stream recreation or permission prompts
+    if (activeTab === 'qr' && html5QrCodeRef.current) {
       setTimeout(() => {
         try {
-          if (html5QrCodeRef.current) {
+          if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
             html5QrCodeRef.current.resume();
+            isPausedRef.current = false;
+          } else {
+            startCamera();
           }
-          isPausedRef.current = false;
         } catch {
           startCamera();
         }
-      }, 150);
+      }, 50);
     }
   };
 
@@ -778,9 +785,12 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
         </div>
       )}
 
-      {/* ── Mode 1: Camera Scanner Viewfinder ── */}
-      {activeTab === 'qr' && !preview && !admissionResult && (
-        <div className="gate-viewfinder-card">
+      {/* ── Mode 1: Camera Scanner Viewfinder (Kept permanently mounted to preserve video stream and camera permissions) ── */}
+      {activeTab === 'qr' && (
+        <div 
+          className="gate-viewfinder-card"
+          style={{ display: preview || admissionResult ? 'none' : 'block' }}
+        >
           <div
             id="qr-reader-container"
             className="gate-camera-viewport"
