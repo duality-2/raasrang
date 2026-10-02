@@ -310,3 +310,15 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.passes;
   END IF;
 END $$;
+
+-- 6. Confirmed Real Event Night Dates (Day 1 on 11th October 2026, then 9 consecutive days)
+UPDATE public.event_nights SET event_date = '2026-10-11', start_time = '2026-10-11T18:00:00+05:30', end_time = '2026-10-11T23:30:00+05:30' WHERE id = 'night_1';
+UPDATE public.event_nights SET event_date = '2026-10-12', start_time = '2026-10-12T18:00:00+05:30', end_time = '2026-10-12T23:30:00+05:30' WHERE id = 'night_2';
+UPDATE public.event_nights SET event_date = '2026-10-13', start_time = '2026-10-13T18:00:00+05:30', end_time = '2026-10-13T23:30:00+05:30' WHERE id = 'night_3';
+UPDATE public.event_nights SET event_date = '2026-10-14', start_time = '2026-10-14T18:00:00+05:30', end_time = '2026-10-14T23:30:00+05:30' WHERE id = 'night_4';
+UPDATE public.event_nights SET event_date = '2026-10-15', start_time = '2026-10-15T18:00:00+05:30', end_time = '2026-10-15T23:30:00+05:30' WHERE id = 'night_5';
+UPDATE public.event_nights SET event_date = '2026-10-16', start_time = '2026-10-16T18:00:00+05:30', end_time = '2026-10-16T23:30:00+05:30' WHERE id = 'night_6';
+UPDATE public.event_nights SET event_date = '2026-10-17', start_time = '2026-10-17T18:00:00+05:30', end_time = '2026-10-17T23:30:00+05:30' WHERE id = 'night_7';
+UPDATE public.event_nights SET event_date = '2026-10-18', start_time = '2026-10-18T18:00:00+05:30', end_time = '2026-10-18T23:30:00+05:30' WHERE id = 'night_8';
+UPDATE public.event_nights SET event_date = '2026-10-19', start_time = '2026-10-19T18:00:00+05:30', end_time = '2026-10-19T23:30:00+05:30' WHERE id = 'night_9';
+

@@ -135,24 +135,73 @@ export async function seedEventNights() {
     const admin = createAdminClient();
     const rows = Array.from({ length: 9 }).map((_, i) => {
       const num = i + 1;
-      const date = new Date(2026, 9, 3 + num); // Starts Oct 4
+      const day = 10 + num; // Day 1 = Oct 11, Day 9 = Oct 19
+      const dateStr = `2026-10-${day.toString().padStart(2, '0')}`;
       return {
         id: `night_${num}`,
         night_number: num,
         title: `Day ${num}`,
-        event_date: date.toISOString().split('T')[0],
-        start_time: new Date(date.getTime() + 18 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(date.getTime() + 23.5 * 60 * 60 * 1000).toISOString(),
-        is_active: false
+        event_date: dateStr,
+        start_time: `${dateStr}T18:00:00+05:30`,
+        end_time: `${dateStr}T23:30:00+05:30`,
+        is_active: num === 1,
       };
     });
 
-    const { error } = await admin.from('event_nights').insert(rows);
+    const { error } = await admin.from('event_nights').upsert(rows, { onConflict: 'id' });
     if (error) {
       return { success: false, error: error.message };
     }
     
+    revalidatePath('/dashboard');
     revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/add');
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Update existing event nights to confirmed real dates:
+ * Day 1 on 11th October 2026, then 9 consecutive days (Oct 11 - Oct 19).
+ */
+export async function updateRealEventNightDatesAction() {
+  const { user, authorized } = await requireOrganiser();
+  if (!authorized || !user) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const updates = Array.from({ length: 9 }).map((_, i) => {
+      const num = i + 1;
+      const day = 10 + num; // Day 1 = Oct 11, Day 9 = Oct 19
+      const dateStr = `2026-10-${day.toString().padStart(2, '0')}`;
+      return {
+        id: `night_${num}`,
+        event_date: dateStr,
+        start_time: `${dateStr}T18:00:00+05:30`,
+        end_time: `${dateStr}T23:30:00+05:30`,
+      };
+    });
+
+    for (const row of updates) {
+      await admin
+        .from('event_nights')
+        .update({
+          event_date: row.event_date,
+          start_time: row.start_time,
+          end_time: row.end_time,
+        })
+        .eq('id', row.id);
+    }
+
+    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/add');
+    revalidatePath('/dashboard/verify');
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
