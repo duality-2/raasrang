@@ -72,7 +72,7 @@ export default function Header({ email, userRole }: HeaderProps) {
                 href="/dashboard/admin"
                 className={`nav-link ${pathname === '/dashboard/admin' ? 'active' : ''}`}
               >
-                ⚙️ Event Settings
+                👥 Attendance & Settings
               </Link>
             </>
           )}

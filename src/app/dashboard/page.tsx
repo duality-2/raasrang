@@ -101,6 +101,9 @@ export default async function DashboardPage() {
           <Link href="/dashboard/verify" className="btn btn-primary dashboard-verify-btn">
             Open Scanner
           </Link>
+          <Link href="/dashboard/admin" className="btn btn-secondary">
+            👥 Attendance & Footfall
+          </Link>
           <Link href="/dashboard/add" className="btn btn-secondary">
             + New Attendee
           </Link>
