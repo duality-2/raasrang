@@ -34,11 +34,10 @@ export default function EventNightControls({ nights }: EventNightControlsProps) 
   return (
     <div className="event-night-controls">
       <div style={{ marginBottom: '20px', padding: '16px', background: 'rgba(4, 120, 87, 0.05)', borderRadius: '8px', border: '1px solid rgba(4, 120, 87, 0.2)' }}>
-        <h3 style={{ margin: '0 0 10px 0', color: '#047857' }}>🌟 Seasonal Passes Replenishment</h3>
+        <h3 style={{ margin: '0 0 10px 0', color: '#047857' }}>🌟 Event Days & Seasonal Pass Replenishment</h3>
         <p style={{ margin: '0', fontSize: '0.9rem', color: '#374151', lineHeight: '1.5' }}>
-          Seasonal passes automatically replenish for scanning whenever a <strong>new event night is started</strong>. 
-          Currently, <strong>{activeNight ? activeNight.title : 'no night'}</strong> is active. 
-          When you stop the current night and start the next one, all seasonal passes will immediately become valid again for that new night.
+          When you click <strong>Start Day</strong>, that day becomes active immediately. Only tickets for that day and seasonal passes can be admitted (e.g. Day 3 tickets will be rejected if Day 1 is active).
+          When you click <strong>End Day</strong>, gate scanning is paused. Switching to a new day automatically <strong>replenishes all seasonal passes</strong> for the new day!
         </p>
       </div>
 
@@ -88,8 +87,8 @@ export default function EventNightControls({ nights }: EventNightControlsProps) 
                   </span>
                 )}
               </h4>
-              <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
-                {night.event_date} | {night.start_time} - {night.end_time}
+              <div style={{ fontSize: '0.85rem', color: night.is_active ? '#047857' : '#6b7280', fontWeight: night.is_active ? 600 : 400 }}>
+                {night.is_active ? '● Active — Only this day\'s tickets and seasonal passes can enter' : '○ Inactive — Tickets for this day cannot be scanned'}
               </div>
             </div>
 

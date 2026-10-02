@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOrganiser } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
@@ -95,14 +96,14 @@ export async function toggleEventNightStatus(id: string, isActive: boolean) {
   }
 
   try {
-    const supabase = await createClient();
+    const admin = createAdminClient();
     
-    // If we are starting a day, we probably should end all other days first to prevent multiple active days
+    // If we are starting a day, we end all other days first to ensure only 1 day is active
     if (isActive) {
-      await supabase.from('event_nights').update({ is_active: false }).neq('id', id);
+      await admin.from('event_nights').update({ is_active: false }).neq('id', id);
     }
     
-    const { error } = await supabase
+    const { error } = await admin
       .from('event_nights')
       .update({ is_active: isActive })
       .eq('id', id);
@@ -131,7 +132,7 @@ export async function seedEventNights() {
   }
 
   try {
-    const supabase = await createClient();
+    const admin = createAdminClient();
     const rows = Array.from({ length: 9 }).map((_, i) => {
       const num = i + 1;
       const date = new Date(2026, 9, 3 + num); // Starts Oct 4
@@ -146,7 +147,7 @@ export async function seedEventNights() {
       };
     });
 
-    const { error } = await supabase.from('event_nights').insert(rows);
+    const { error } = await admin.from('event_nights').insert(rows);
     if (error) {
       return { success: false, error: error.message };
     }
