@@ -66,22 +66,26 @@ CREATE TABLE IF NOT EXISTS public.event_nights (
 
 ALTER TABLE public.event_nights ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone authenticated can view event nights" ON public.event_nights;
 CREATE POLICY "Anyone authenticated can view event nights"
   ON public.event_nights FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Admins can insert event nights" ON public.event_nights;
 CREATE POLICY "Admins can insert event nights"
   ON public.event_nights FOR INSERT
   TO authenticated
   WITH CHECK (public.get_current_user_role() = 'admin');
 
+DROP POLICY IF EXISTS "Admins can update event nights" ON public.event_nights;
 CREATE POLICY "Admins can update event nights"
   ON public.event_nights FOR UPDATE
   TO authenticated
   USING (public.get_current_user_role() = 'admin')
   WITH CHECK (public.get_current_user_role() = 'admin');
 
+DROP POLICY IF EXISTS "Admins can delete event nights" ON public.event_nights;
 CREATE POLICY "Admins can delete event nights"
   ON public.event_nights FOR DELETE
   TO authenticated
@@ -135,11 +139,13 @@ CREATE TABLE IF NOT EXISTS public.pass_eligible_nights (
 
 ALTER TABLE public.pass_eligible_nights ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone authenticated can view eligible nights" ON public.pass_eligible_nights;
 CREATE POLICY "Anyone authenticated can view eligible nights"
   ON public.pass_eligible_nights FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Admins and ticketers can manage eligible nights" ON public.pass_eligible_nights;
 CREATE POLICY "Admins and ticketers can manage eligible nights"
   ON public.pass_eligible_nights FOR ALL
   TO authenticated
@@ -231,12 +237,14 @@ DROP POLICY IF EXISTS "Scanners can view passes" ON public.passes;
 DROP POLICY IF EXISTS "Organisers can create passes" ON public.passes;
 
 -- Admins: Full SELECT
+DROP POLICY IF EXISTS "Admins can view passes" ON public.passes;
 CREATE POLICY "Admins can view passes"
   ON public.passes FOR SELECT
   TO authenticated
   USING (public.get_current_user_role() = 'admin');
 
 -- Ticketers: Can ONLY view passes they created
+DROP POLICY IF EXISTS "Ticketers can view their own passes" ON public.passes;
 CREATE POLICY "Ticketers can view their own passes"
   ON public.passes FOR SELECT
   TO authenticated
@@ -246,6 +254,7 @@ CREATE POLICY "Ticketers can view their own passes"
   );
 
 -- Admins and Ticketers: Insert passes
+DROP POLICY IF EXISTS "Admins and ticketers can create passes" ON public.passes;
 CREATE POLICY "Admins and ticketers can create passes"
   ON public.passes FOR INSERT
   TO authenticated
@@ -255,11 +264,13 @@ CREATE POLICY "Admins and ticketers can create passes"
   );
 
 -- Admissions Policies (no gate filtering — all scanners see recent admissions)
+DROP POLICY IF EXISTS "Admins can view all admissions" ON public.admissions;
 CREATE POLICY "Admins can view all admissions"
   ON public.admissions FOR SELECT
   TO authenticated
   USING (public.get_current_user_role() = 'admin');
 
+DROP POLICY IF EXISTS "Scanners can view recent admissions" ON public.admissions;
 CREATE POLICY "Scanners can view recent admissions"
   ON public.admissions FOR SELECT
   TO authenticated
@@ -269,17 +280,20 @@ CREATE POLICY "Scanners can view recent admissions"
   );
 
 -- Corrections Policies
+DROP POLICY IF EXISTS "Admins can manage corrections" ON public.admission_corrections;
 CREATE POLICY "Admins can manage corrections"
   ON public.admission_corrections FOR ALL
   TO authenticated
   USING (public.get_current_user_role() = 'admin');
 
 -- Deliveries Policies
+DROP POLICY IF EXISTS "Admins can view all deliveries" ON public.ticket_deliveries;
 CREATE POLICY "Admins can view all deliveries"
   ON public.ticket_deliveries FOR ALL
   TO authenticated
   USING (public.get_current_user_role() = 'admin');
 
+DROP POLICY IF EXISTS "Ticketers can manage their own deliveries" ON public.ticket_deliveries;
 CREATE POLICY "Ticketers can manage their own deliveries"
   ON public.ticket_deliveries FOR ALL
   TO authenticated
