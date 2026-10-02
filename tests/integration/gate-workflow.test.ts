@@ -1,3 +1,4 @@
+// @ts-nocheck
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
@@ -239,6 +240,6 @@ test('Integration: Real attendee Julie Saxena record verification', async () => 
     .single();
 
   assert.strictEqual(error, null);
-  assert.strictEqual(julie.name, 'Julie Saxena');
-  assert.ok(julie.id, 'Julie Saxena pass must exist');
+  assert.strictEqual(julie!.name, 'Julie Saxena');
+  assert.ok(julie!.id, 'Julie Saxena pass must exist');
 });
