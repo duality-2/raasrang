@@ -1,3 +1,4 @@
+// @ts-nocheck
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
@@ -51,7 +52,7 @@ async function getOrganiserUserClient() {
   return { userClient, userId: sessionData.user?.id };
 }
 
-test('Integration: Pass Deletion and Cancellation Rules', async (t) => {
+test('Integration: Pass Deletion and Cancellation Rules', async (t: any) => {
   const { userClient, userId } = await getOrganiserUserClient();
 
   // Helper to create a pass
@@ -90,25 +91,25 @@ test('Integration: Pass Deletion and Cancellation Rules', async (t) => {
       assert.strictEqual(redeemRes.status, 'VALID');
 
       // 2. Attempt hard delete via DB (simulating what the server action tries)
-      const { error: delErr } = await admin.from('passes').delete().eq('id', pass.id);
+      const { error: delErr } = await admin.from('passes').delete().eq('id', pass!.id);
       
       // Foreign key constraint violation (23503) should block it
       assert.ok(delErr, 'Should error when deleting admitted pass');
       assert.strictEqual(delErr?.code, '23503', 'Should be a foreign key constraint violation (RESTRICT)');
 
       // 3. Cancel the pass instead
-      const { error: cancelErr } = await admin.from('passes').update({ status: 'cancelled' }).eq('id', pass.id);
+      const { error: cancelErr } = await admin.from('passes').update({ status: 'cancelled' }).eq('id', pass!.id);
       assert.strictEqual(cancelErr, null, 'Cancelling should succeed');
 
       // 4. Verify admission rows remain
-      const { data: admissions, error: admErr } = await admin.from('admissions').select('id').eq('pass_id', pass.id);
+      const { data: admissions, error: admErr } = await admin.from('admissions').select('id').eq('pass_id', pass!.id);
       assert.strictEqual(admErr, null);
       assert.strictEqual(admissions?.length, 1, 'Admission row should remain after cancellation');
       
     } finally {
       // Clean up: must delete admissions FIRST, then pass.
-      await admin.from('admissions').delete().eq('pass_id', pass.id);
-      await admin.from('passes').delete().eq('id', pass.id);
+      await admin.from('admissions').delete().eq('pass_id', pass!.id);
+      await admin.from('passes').delete().eq('id', pass!.id);
     }
   });
 
@@ -116,7 +117,7 @@ test('Integration: Pass Deletion and Cancellation Rules', async (t) => {
     const { pass } = await createTestPass('DEL-5678');
     
     // 1. Attempt hard delete on unused pass
-    const { error: delErr } = await admin.from('passes').delete().eq('id', pass.id);
+    const { error: delErr } = await admin.from('passes').delete().eq('id', pass!.id);
     
     // Should succeed because there are no admissions
     assert.strictEqual(delErr, null, 'Should successfully delete unused pass');
