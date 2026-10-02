@@ -36,7 +36,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: pass, error: passError } = await admin
     .from('passes')
-    .select('*, event_nights!valid_night_id(title)')
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -53,9 +53,15 @@ export async function GET(
     });
   }
 
+  let night = null;
+  if (p.ticket_type === 'single' && p.valid_night_id) {
+    const { data: nights } = await admin.from('event_nights').select('*');
+    night = (nights || []).find(n => n.id === p.valid_night_id) || null;
+  }
+
   // 5. Generate PDF in-memory (never written to /public)
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
-  const pdfBytes = await generateTicketPdf(p, isTest);
+  const pdfBytes = await generateTicketPdf(p, isTest, night);
 
   // 6. Return private stream
   return new NextResponse(Buffer.from(pdfBytes), {

@@ -8,6 +8,7 @@ interface PhysicalTicketCardProps {
   pass: Pass;
   ticketNumber?: number;
   isTestBatch?: boolean;
+  night?: any;
 }
 
 /**
@@ -20,7 +21,7 @@ interface PhysicalTicketCardProps {
  * - Perforation line: visible between main body and stub
  * - Right stub: Mini-logo, dates, dynamic QR code (replaces sample QR), attendee manual code
  */
-export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: PhysicalTicketCardProps) {
+export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, night }: PhysicalTicketCardProps) {
   const cfg = TICKET_LAYOUT_CONFIG;
   const displayName = pass.name || 'Admit One';
 
@@ -193,7 +194,7 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
         >
           {pass.ticket_type === 'seasonal'
             ? 'ALL DAYS'
-            : ((pass.event_nights as any)?.title || 'DAY 1').toUpperCase()}
+            : (night?.title || 'DAY 1').toUpperCase()}
         </span>
       </div>
 

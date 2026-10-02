@@ -27,7 +27,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
   const admin = createAdminClient();
   let query = admin
     .from('passes')
-    .select('*, event_nights!valid_night_id(title)')
+    .select('*')
     .eq('id', id);
 
   if (role === 'ticketer') {
@@ -91,7 +91,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-            <PhysicalTicketCard pass={p} />
+            <PhysicalTicketCard pass={p} night={night} />
           </div>
         </div>
 
@@ -196,7 +196,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
 
       {/* Printable Area (visible only in print) */}
       <div className="print-only">
-        <PhysicalTicketCard pass={p} />
+        <PhysicalTicketCard pass={p} night={night} />
       </div>
     </div>
   );

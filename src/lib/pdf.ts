@@ -17,7 +17,7 @@ import { TICKET_LAYOUT_CONFIG } from './ticket-config.ts';
  * - Never prints internal database UUID as entry code.
  * - In-memory only: never saved under /public or exposed to permanent public URLs.
  */
-export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Promise<Uint8Array> {
+export async function generateTicketPdf(pass: Pass, isTest: boolean = false, night?: any): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
   // Printable dimensions: 552.75 pt x 207.28 pt (aspect ratio 2.666:1)
@@ -135,7 +135,7 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
   // Day Override Badge (Covers DAY - 1 baked-in text)
   const dayText = pass.ticket_type === 'seasonal'
     ? 'ALL DAYS'
-    : ((pass.event_nights as any)?.title || 'DAY 1').toUpperCase();
+    : (night?.title || 'DAY 1').toUpperCase();
     
   const dayTextWidth = fontHelveticaBold.widthOfTextAtSize(dayText, 18);
   const dayBadgeX = widthPt * 0.605 - (dayTextWidth / 2); // Shifted slightly left under Nexora logo
