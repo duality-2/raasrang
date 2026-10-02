@@ -34,7 +34,7 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
     try {
       if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
         // Fetch PDF blob
-        const res = await fetch(`/api/tickets/${pass.id}/pdf`);
+        const res = await fetch(`/api/passes/${pass.id}/pdf`);
         const blob = await res.blob();
         const file = new File([blob], `RaasRang-Ticket-${pass.manual_code}.pdf`, { type: 'application/pdf' });
 
@@ -53,7 +53,7 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
       // Fallback: If no native share, or canShare with file is not supported
       // 1. Download PDF
       const link = document.createElement('a');
-      link.href = `/api/tickets/${pass.id}/pdf`;
+      link.href = `/api/passes/${pass.id}/pdf`;
       link.download = `RaasRang-Ticket-${pass.manual_code}.pdf`;
       document.body.appendChild(link);
       link.click();
