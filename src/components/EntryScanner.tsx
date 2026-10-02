@@ -13,6 +13,8 @@ import { formatDate } from '@/lib/utils';
 import {
   playPassSound,
   playRejectSound,
+  unlockAudioSystem,
+  getSharedAudioContext,
   isMuted,
   setMuted as storeMuted,
 } from '@/lib/sounds';
@@ -29,7 +31,6 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
   // Sound state
   const [muted, setMutedState] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
 
   // Flash state
   const [flashColor, setFlashColor] = useState<'green' | 'red' | null>(null);
@@ -55,6 +56,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
   // Apply camera zoom (hardware zoom with seamless CSS transform fallback)
   const applyZoom = useCallback(async (level: number) => {
+    unlockAudioSystem();
     const clamped = Math.max(1, Math.min(level, 3.5));
     setZoomLevel(clamped);
 
@@ -111,19 +113,31 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
     };
   }, []);
 
-  // Initialize AudioContext on user gesture (iOS Safari requirement)
+  // Register global touch/click gesture listeners to unlock mobile audio on first user interaction
+  useEffect(() => {
+    const handleGesture = () => {
+      unlockAudioSystem();
+    };
+
+    window.addEventListener('touchstart', handleGesture, { passive: true });
+    window.addEventListener('touchend', handleGesture, { passive: true });
+    window.addEventListener('pointerdown', handleGesture, { passive: true });
+    window.addEventListener('click', handleGesture, { passive: true });
+    window.addEventListener('keydown', handleGesture, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleGesture);
+      window.removeEventListener('touchend', handleGesture);
+      window.removeEventListener('pointerdown', handleGesture);
+      window.removeEventListener('click', handleGesture);
+      window.removeEventListener('keydown', handleGesture);
+    };
+  }, []);
+
+  // Ensure AudioContext is initialized and unlocked on user gesture
   const ensureAudioContext = useCallback(() => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext
-      )();
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-    return audioContextRef.current;
+    unlockAudioSystem();
+    return getSharedAudioContext();
   }, []);
 
   // Flash screen effect
@@ -175,9 +189,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
             message: previewRes.message,
           });
           triggerFlash('red');
-          if (!isMuted() && audioContextRef.current) {
-            playRejectSound(audioContextRef.current);
-          }
+          playRejectSound();
         } else {
           // Valid ticket allowance found
           setPreview(previewRes);
@@ -195,9 +207,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
           message: 'Network timeout previewing ticket. DO NOT ADMIT.',
         });
         triggerFlash('red');
-        if (!isMuted() && audioContextRef.current) {
-          playRejectSound(audioContextRef.current);
-        }
+        playRejectSound();
       } finally {
         if (mountedRef.current) {
           setIsProcessing(false);
@@ -238,14 +248,10 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
       if (result.status === 'ADMIT_N') {
         triggerFlash('green');
-        if (!isMuted() && audioContextRef.current) {
-          playPassSound(audioContextRef.current);
-        }
+        playPassSound();
       } else {
         triggerFlash('red');
-        if (!isMuted() && audioContextRef.current) {
-          playRejectSound(audioContextRef.current);
-        }
+        playRejectSound();
       }
     } catch {
       if (!mountedRef.current) return;
@@ -255,9 +261,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
         message: 'Network timeout during admission. DO NOT ADMIT. Ambiguous outcome.',
       });
       triggerFlash('red');
-      if (!isMuted() && audioContextRef.current) {
-        playRejectSound(audioContextRef.current);
-      }
+      playRejectSound();
     } finally {
       if (mountedRef.current) {
         setIsProcessing(false);
@@ -419,6 +423,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
   // Tab switching handler
   const handleTabSwitch = (newTab: 'qr' | 'manual') => {
+    unlockAudioSystem();
     if (newTab === activeTab) return;
     if (activeTab === 'qr') {
       stopCamera();
@@ -438,11 +443,11 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
   // Test sound
   const handleTestSound = () => {
-    const ctx = ensureAudioContext();
-    playPassSound(ctx);
+    unlockAudioSystem();
+    playPassSound();
     setTimeout(() => {
-      playRejectSound(ctx);
-    }, 500);
+      playRejectSound();
+    }, 600);
   };
 
   // Format manual code as user types or pastes (XXXX-XXXX)
@@ -464,6 +469,7 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
 
   // Reset screen for next attendee scan (staff explicitly taps "Scan Next")
   const handleResetForNext = () => {
+    unlockAudioSystem();
     setPreview(null);
     setSelectedCount(null);
     setAdmissionResult(null);
