@@ -141,13 +141,22 @@ export async function generateTicketPdf(pass: Pass, isTest: boolean = false): Pr
   const dayBadgeX = widthPt * 0.605 - (dayTextWidth / 2); // Shifted slightly left under Nexora logo
   const dayBadgeY = heightPt * 0.45; // Perfectly positioned above text
 
-  // Text inside Day badge
+  // Draw solid black rectangle to cover baked-in "DAY - 1" text
+  page.drawRectangle({
+    x: widthPt * 0.605 - 40, // Centered around the text area
+    y: dayBadgeY - 5,
+    width: 80,
+    height: 25,
+    color: rgb(0, 0, 0), // Solid black background
+  });
+
+  // Text inside Day badge (White for contrast against black box)
   page.drawText(dayText, {
     x: dayBadgeX,
     y: dayBadgeY,
     size: 18,
     font: fontHelveticaBold,
-    color: rgb(0, 0, 0), // Solid black
+    color: rgb(1, 1, 1), // White text
   });
 
   // TEST Watermark (only for test passes)

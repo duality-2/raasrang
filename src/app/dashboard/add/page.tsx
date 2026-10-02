@@ -217,54 +217,11 @@ export default function AddAttendeePage() {
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.92rem', color: '#6b21a8' }}>
                 Seasonal Pass Validity (All 9 Nights of Navratri)
               </h4>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="seasonal_start_night_id" className="form-label">
-                    Starting Night
-                  </label>
-                  <select
-                    id="seasonal_start_night_id"
-                    name="seasonal_start_night_id"
-                    className="form-select"
-                    value={startNight}
-                    onChange={(e) => setStartNight(e.target.value)}
-                    disabled={loading || success}
-                  >
-                    {eventNights.length > 0
-                      ? eventNights.map((night) => (
-                          <option key={night.id} value={night.id}>
-                            {night.title} ({night.event_date})
-                          </option>
-                        ))
-                      : [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                          <option key={`night_${n}`} value={`night_${n}`}>
-                            Night {n}
-                          </option>
-                        ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="seasonal_nights_count" className="form-label">
-                    Consecutive Nights Duration
-                  </label>
-                  <select
-                    id="seasonal_nights_count"
-                    name="seasonal_nights_count"
-                    className="form-select"
-                    value={nightsCount}
-                    onChange={(e) => setNightsCount(Number(e.target.value))}
-                    disabled={loading || success}
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-                      <option key={n} value={n}>
-                        {n} Night{n > 1 ? 's' : ''} {n === 9 ? '(Full Season)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>
+                This pass will automatically be valid for all 9 nights of the event, resetting every night.
+              </p>
+              <input type="hidden" name="seasonal_start_night_id" value="night_1" />
+              <input type="hidden" name="seasonal_nights_count" value="9" />
             </div>
           )}
 

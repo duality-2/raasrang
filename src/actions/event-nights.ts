@@ -83,3 +83,40 @@ export async function saveEventNightAction(formData: FormData) {
     return { success: false, error: message };
   }
 }
+
+/**
+ * Toggle the active status of an event night (Admin only).
+ * Starts or ends a day.
+ */
+export async function toggleEventNightStatus(id: string, isActive: boolean) {
+  const { user, authorized } = await requireOrganiser();
+  if (!authorized || !user) {
+    return { success: false, error: 'Unauthorized: Only admins can manage event schedules.' };
+  }
+
+  try {
+    const supabase = await createClient();
+    
+    // If we are starting a day, we probably should end all other days first to prevent multiple active days
+    if (isActive) {
+      await supabase.from('event_nights').update({ is_active: false }).neq('id', id);
+    }
+    
+    const { error } = await supabase
+      .from('event_nights')
+      .update({ is_active: isActive })
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/dashboard');
+    revalidatePath('/dashboard/admin');
+    revalidatePath('/dashboard/verify');
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}

@@ -180,7 +180,10 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch }: 
       >
         <span
           style={{
-            color: '#000000', // Black ink
+            color: '#ffffff', // White ink
+            backgroundColor: '#000000', // Solid black background to cover baked-in text
+            padding: '2px 8px',
+            borderRadius: '4px',
             fontWeight: 900,
             fontFamily: 'system-ui, -apple-system, sans-serif',
             fontSize: 'clamp(15px, 2.2vw, 28px)',
