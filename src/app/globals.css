@@ -1287,6 +1287,65 @@ h1, h2, h3, h4 {
   background: #000000;
   border-radius: var(--radius-md);
   overflow: hidden;
+  position: relative;
+}
+
+.gate-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1c1815;
+  border: 1px solid #382F27;
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-top: 10px;
+  color: #D4CECA;
+  flex-wrap: wrap;
+}
+
+.gate-zoom-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #9C948D;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gate-zoom-presets {
+  display: flex;
+  gap: 6px;
+}
+
+.gate-zoom-pill {
+  background: #2a241f;
+  border: 1px solid #4a3e35;
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gate-zoom-pill:hover {
+  background: #3d332b;
+}
+
+.gate-zoom-pill.active {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.4);
+}
+
+.gate-zoom-slider {
+  flex: 1;
+  min-width: 80px;
+  accent-color: #d97706;
+  cursor: pointer;
+  height: 6px;
 }
 
 .gate-camera-actions {

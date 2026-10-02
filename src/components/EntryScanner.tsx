@@ -51,6 +51,48 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
   const mountedRef = useRef(true);
   const [scannerActive, setScannerActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+
+  // Apply camera zoom (hardware zoom with seamless CSS transform fallback)
+  const applyZoom = useCallback(async (level: number) => {
+    const clamped = Math.max(1, Math.min(level, 3.5));
+    setZoomLevel(clamped);
+
+    const videoEl = document.querySelector('#qr-reader-container video') as HTMLVideoElement | null;
+    let hardwareApplied = false;
+
+    if (videoEl && videoEl.srcObject) {
+      try {
+        const stream = videoEl.srcObject as MediaStream;
+        const [track] = stream.getVideoTracks();
+        if (track && typeof track.getCapabilities === 'function') {
+          const caps = track.getCapabilities() as Record<string, unknown>;
+          if (caps && 'zoom' in caps) {
+            const zoomCap = caps.zoom as { min?: number; max?: number } | undefined;
+            const zMin = zoomCap?.min ?? 1;
+            const zMax = zoomCap?.max ?? 5;
+            const target = Math.min(Math.max(clamped, zMin), zMax);
+            await track.applyConstraints({
+              advanced: [{ zoom: target } as MediaTrackConstraintSet],
+            });
+            hardwareApplied = true;
+          }
+        }
+      } catch {
+        hardwareApplied = false;
+      }
+    }
+
+    if (videoEl) {
+      if (!hardwareApplied) {
+        videoEl.style.transform = `scale(${clamped})`;
+        videoEl.style.transformOrigin = 'center center';
+        videoEl.style.transition = 'transform 0.15s ease-out';
+      } else {
+        videoEl.style.transform = 'none';
+      }
+    }
+  }, []);
 
   // Synchronize processing ref
   useEffect(() => {
@@ -744,6 +786,35 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
             className="gate-camera-viewport"
             aria-label="QR Code Camera Viewfinder"
           />
+
+          {/* ── Camera Zoom Controls ── */}
+          {scannerActive && !cameraError && (
+            <div className="gate-zoom-controls">
+              <span className="gate-zoom-label">🔍 Zoom</span>
+              <div className="gate-zoom-presets">
+                {[1, 1.5, 2, 2.5, 3].map((z) => (
+                  <button
+                    key={z}
+                    type="button"
+                    className={`gate-zoom-pill ${Math.abs(zoomLevel - z) < 0.1 ? 'active' : ''}`}
+                    onClick={() => applyZoom(z)}
+                  >
+                    {z}x
+                  </button>
+                ))}
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="0.1"
+                value={zoomLevel}
+                onChange={(e) => applyZoom(parseFloat(e.target.value))}
+                className="gate-zoom-slider"
+                aria-label="Camera Zoom Slider"
+              />
+            </div>
+          )}
 
           {cameraError && (
             <div className="alert alert-error mt-4" role="alert">
