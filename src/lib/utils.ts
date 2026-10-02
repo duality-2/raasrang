@@ -154,15 +154,17 @@ export function validatePassInput(input: {
     errors.ticket_type = 'Ticket type must be single or seasonal.';
   }
 
-  // Party Size: minimum 1, whole numbers only, no upper limit
+  // Party Size: minimum 1, maximum 100, whole numbers only
   let party_size = 1;
   const rawPartyInput = input.party_size ?? 1;
   if (typeof rawPartyInput === 'string' && rawPartyInput.trim() === '') {
-    errors.party_size = 'Party size is required and must be at least 1.';
+    errors.party_size = 'Party size is required and must be between 1 and 100.';
   } else {
     const rawPartySize = Number(rawPartyInput);
     if (isNaN(rawPartySize) || !Number.isInteger(rawPartySize) || rawPartySize < 1) {
       errors.party_size = 'Party size must be a whole number of at least 1.';
+    } else if (rawPartySize > 100) {
+      errors.party_size = 'Party size cannot exceed 100.';
     } else {
       party_size = rawPartySize;
     }

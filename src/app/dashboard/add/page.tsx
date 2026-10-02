@@ -152,16 +152,17 @@ export default function AddAttendeePage() {
             <input type="hidden" name="ticket_type" value={ticketType} />
           </div>
 
-          {/* ── 2. Typable Party Size (Minimum 1, No Upper Limit) ── */}
+          {/* ── 2. Typable Party Size (1 to 100) ── */}
           <div className="form-group">
             <label htmlFor="party_size" className="form-label">
-              Party Size (Attendees per admission)<span className="form-required">*</span>
+              Party Size (Attendees per admission, max 100)<span className="form-required">*</span>
             </label>
             <input
               id="party_size"
               name="party_size"
               type="number"
               min="1"
+              max="100"
               step="1"
               className={`form-input ${fieldErrors.party_size ? 'error' : ''}`}
               value={partySize}
@@ -169,7 +170,7 @@ export default function AddAttendeePage() {
                 const val = e.target.value;
                 setPartySize(val === '' ? '' : parseInt(val, 10) || 1);
               }}
-              placeholder="e.g. 1, 2, 5, 20, 50"
+              placeholder="e.g. 1, 2, 5, 20, 50, 100"
               required
               disabled={loading || success}
               style={{ fontSize: '1.05rem', fontWeight: 600, padding: '10px 14px' }}
@@ -180,7 +181,7 @@ export default function AddAttendeePage() {
             <div className="form-hint" style={{ marginTop: '4px' }}>
               {Number(partySize) === 1
                 ? 'Individual ticket (1 person)'
-                : `Group ticket: allows up to ${partySize || 1} people${
+                : `Group ticket: allows up to ${partySize || 1} people (max 100)${
                     ticketType === 'seasonal' ? ' per eligible night' : ' total'
                   }`}
             </div>

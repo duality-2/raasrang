@@ -51,7 +51,7 @@ test('Party size validation: rejects blank strings', () => {
   assert.ok(blankRes2.errors.party_size);
 });
 
-test('Party size validation: accepts large numbers (> 10) with no upper limit', () => {
+test('Party size validation: accepts numbers up to 100 and rejects numbers > 100', () => {
   const res15 = validatePassInput({
     party_size: 15,
     valid_night_id: 'night_1',
@@ -73,12 +73,19 @@ test('Party size validation: accepts large numbers (> 10) with no upper limit', 
   assert.strictEqual(res100.valid, true);
   assert.strictEqual(res100.data?.party_size, 100);
 
+  const res101 = validatePassInput({
+    party_size: 101,
+    valid_night_id: 'night_1',
+  });
+  assert.strictEqual(res101.valid, false);
+  assert.strictEqual(res101.errors.party_size, 'Party size cannot exceed 100.');
+
   const res500 = validatePassInput({
     party_size: 500,
     valid_night_id: 'night_1',
   });
-  assert.strictEqual(res500.valid, true);
-  assert.strictEqual(res500.data?.party_size, 500);
+  assert.strictEqual(res500.valid, false);
+  assert.strictEqual(res500.errors.party_size, 'Party size cannot exceed 100.');
 });
 
 // ── 2. Scanner Typed Count Validation ──

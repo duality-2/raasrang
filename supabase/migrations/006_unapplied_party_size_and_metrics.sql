@@ -9,13 +9,13 @@
 -- and Realtime publication configuration.
 -- ============================================================================
 
--- 1. Remove 1-10 upper bound on public.passes.party_size (keep party_size >= 1)
+-- 1. Update upper bound on public.passes.party_size to 100
 ALTER TABLE public.passes DROP CONSTRAINT IF EXISTS passes_party_size_check;
-ALTER TABLE public.passes ADD CONSTRAINT passes_party_size_check CHECK (party_size >= 1);
+ALTER TABLE public.passes ADD CONSTRAINT passes_party_size_check CHECK (party_size >= 1 AND party_size <= 100);
 
--- 2. Remove 1-10 upper bound on public.admissions.people_count (keep people_count >= 1)
+-- 2. Update upper bound on public.admissions.people_count to 100
 ALTER TABLE public.admissions DROP CONSTRAINT IF EXISTS admissions_people_count_check;
-ALTER TABLE public.admissions ADD CONSTRAINT admissions_people_count_check CHECK (people_count >= 1);
+ALTER TABLE public.admissions ADD CONSTRAINT admissions_people_count_check CHECK (people_count >= 1 AND people_count <= 100);
 
 -- 3. Update public.admit_pass function to remove hardcoded 10 limit
 CREATE OR REPLACE FUNCTION public.admit_pass(
@@ -65,9 +65,9 @@ BEGIN
     );
   END IF;
 
-  -- 3. Validate people count (minimum 1, no upper limit)
-  IF p_people_count IS NULL OR p_people_count < 1 THEN
-    RETURN pg_catalog.jsonb_build_object('status', 'ERROR', 'message', 'Invalid people count.');
+  -- 3. Validate people count (minimum 1, maximum 100)
+  IF p_people_count IS NULL OR p_people_count < 1 OR p_people_count > 100 THEN
+    RETURN pg_catalog.jsonb_build_object('status', 'ERROR', 'message', 'Invalid people count (must be between 1 and 100).');
   END IF;
 
   -- 4. Exclusive row lock on public.passes
