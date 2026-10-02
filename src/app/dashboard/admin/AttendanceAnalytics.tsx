@@ -1,92 +1,229 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
-import type { OverallAttendanceMetrics, DayAttendanceMetrics } from '@/actions/attendance-metrics';
+import { useState, useEffect, useTransition, useCallback } from 'react';
+import type { OverallAttendanceMetrics } from '@/actions/attendance-metrics';
 import { getAttendanceMetrics } from '@/actions/attendance-metrics';
 import { createClient } from '@/lib/supabase/client';
 
 interface AttendanceAnalyticsProps {
-  initialData: OverallAttendanceMetrics;
+  initialData: OverallAttendanceMetrics | null;
 }
 
 export default function AttendanceAnalytics({ initialData }: AttendanceAnalyticsProps) {
-  const [data, setData] = useState<OverallAttendanceMetrics>(initialData);
-  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [data, setData] = useState<OverallAttendanceMetrics | null>(initialData);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedNightId, setSelectedNightId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [lastRefreshedTime, setLastRefreshedTime] = useState<string>('Just now');
-  const [realtimeActive, setRealtimeActive] = useState<boolean>(true);
+  const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
+
+  // Fetch latest metrics from server action
+  const fetchLatestMetrics = useCallback(async () => {
+    try {
+      const fresh = await getAttendanceMetrics();
+      if (fresh) {
+        setData(fresh);
+        setError(null);
+        setLastRefreshedTime(
+          new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })
+        );
+      } else {
+        if (!data) {
+          setError('Failed to load attendance metrics. Please retry.');
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Error fetching metrics:', err);
+      if (!data) {
+        setError('Network error loading metrics. Please retry.');
+      }
+    }
+  }, [data]);
 
   // Manual refresh handler
   const handleRefresh = () => {
     startTransition(async () => {
-      const fresh = await getAttendanceMetrics();
-      if (fresh) {
-        setData(fresh);
-        setLastRefreshedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      }
+      await fetchLatestMetrics();
     });
   };
 
-  // Realtime Supabase channel subscription
+  // 1. Supabase Realtime channel subscription on passes table
   useEffect(() => {
     const supabase = createClient();
 
     const channel = supabase
-      .channel('attendance-realtime-channel')
+      .channel('passes-live-metrics-channel')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'passes' },
         () => {
-          handleRefresh();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'admissions' },
-        () => {
-          handleRefresh();
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'event_nights' },
-        () => {
-          handleRefresh();
+          fetchLatestMetrics();
         }
       )
       .subscribe((status) => {
-        setRealtimeActive(status === 'SUBSCRIBED');
+        setRealtimeConnected(status === 'SUBSCRIBED');
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchLatestMetrics]);
 
-  const { days, seasonSummary, unassignedPassesCount, unassignedPassesPeople, peakDayTitle, peakDayPeople, totalCapacityAcrossDays, totalAdmittedOverall } = data;
+  // 2. Active 5-second Polling Fallback (ensures live updates without page refresh)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchLatestMetrics();
+    }, 5000);
 
-  // Find max people across all days for chart height scaling
-  const maxDayPeople = Math.max(1, ...days.map((d) => d.totalPeopleAttending));
+    return () => clearInterval(intervalId);
+  }, [fetchLatestMetrics]);
 
-  // Filtered day if selected, or all days
-  const activeDay = days.find((d) => d.isActive);
-  const displayedDays = selectedDayId
-    ? days.filter((d) => d.nightId === selectedDayId)
-    : days;
+  // ── ERROR STATE (Never show stale zeros if initial load or fetch failed) ──
+  if (error && !data) {
+    return (
+      <div className="attendance-analytics-container">
+        <div
+          className="alert alert-error"
+          role="alert"
+          style={{
+            padding: '24px',
+            borderRadius: '12px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', marginBottom: '4px' }}>
+                ⚠️ Attendance Metrics Unavailable
+              </div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#b91c1c' }}>
+                {error}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={isPending}
+              className="btn btn-secondary btn-sm"
+              style={{ fontWeight: 700 }}
+            >
+              {isPending ? 'Retrying…' : '↻ Retry Now'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LOADING STATE ──
+  if (!data) {
+    return (
+      <div className="attendance-analytics-container">
+        <div
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: '#ffffff',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>⏳</div>
+          <div style={{ fontWeight: 700, color: '#334155', fontSize: '1rem' }}>
+            Loading Live Attendance Metrics…
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+            Fetching generated pass totals from database
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── EMPTY STATE ──
+  if (data.totalPasses === 0) {
+    return (
+      <div className="attendance-analytics-container">
+        <div
+          style={{
+            padding: '48px 24px',
+            textAlign: 'center',
+            background: '#ffffff',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🎟️</div>
+          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.15rem' }}>
+            No Passes Generated Yet
+          </div>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: '6px 0 0 0' }}>
+            Issue single-day or seasonal passes in Attendee Management to view live attendance candles.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    days,
+    seasonal,
+    unassigned,
+    totalPasses,
+    totalPeople,
+    peakDayTitle,
+    peakDayPeople,
+    totalFootfallCapacity,
+    syncSource,
+  } = data;
+
+  // Max value across all 10 candles (9 days + 1 seasonal) for visual chart scaling
+  const maxCandlePeople = Math.max(
+    1,
+    ...days.map((d) => d.peopleCount),
+    seasonal.peopleCount
+  );
+
+  const selectedDay = selectedNightId
+    ? days.find((d) => d.nightId === selectedNightId) || null
+    : null;
 
   return (
     <div className="attendance-analytics-container">
-      {/* ── Header with Live Realtime Pulse ── */}
+      {/* ── Header with Live Polling / Realtime Pulse ── */}
       <div className="analytics-header">
         <div>
           <div className="analytics-eyebrow">
-            <span className={`realtime-pulse-dot ${realtimeActive ? 'pulse-green' : 'pulse-gray'}`} />
-            <span>{realtimeActive ? 'Live Realtime Sync' : 'Live Sync Offline'}</span>
+            <span className="realtime-pulse-dot pulse-green" />
+            <span>
+              {realtimeConnected
+                ? 'Live Realtime Sync + 5s Polling'
+                : 'Live 5s Polling Active'}
+            </span>
             <span className="last-sync-time">• Synced {lastRefreshedTime}</span>
+            <span
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#475569',
+                background: '#e2e8f0',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                marginLeft: '4px',
+              }}
+            >
+              {syncSource === 'database_rpc' ? 'DB RPC' : 'DB LIVE'}
+            </span>
           </div>
           <h2 className="analytics-title">👥 Total People Attending & Capacity</h2>
           <p className="analytics-subtitle">
-            Calculated footfall per day accounting for individual tickets, group party sizes, and recurring season passes.
+            Calculated footfall per day computed from <strong>tickets generated</strong> (the passes table), accounting for single tickets, group party sizes, and seasonal passes.
           </p>
         </div>
 
@@ -96,16 +233,16 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
             onClick={handleRefresh}
             disabled={isPending}
             className="btn btn-secondary btn-sm refresh-btn"
-            title="Refresh latest numbers"
+            title="Refresh latest numbers from database"
           >
             {isPending ? '↻ Syncing…' : '↻ Refresh Now'}
           </button>
         </div>
       </div>
 
-      {/* ── Top Level Stat KPI Cards ── */}
+      {/* ── Top Level Stat KPI Cards (Generated Passes Data) ── */}
       <div className="analytics-kpi-grid">
-        {/* Metric 1: Peak Day Footfall */}
+        {/* Metric 1: Peak Single-Day Attendance */}
         <div className="kpi-card highlight-purple">
           <div className="kpi-header">
             <span className="kpi-icon">⚡</span>
@@ -116,142 +253,132 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
             <span className="kpi-unit">People Expected</span>
           </div>
           <div className="kpi-subtext">
-            Highest on <strong>{peakDayTitle}</strong> (Combined tickets + season passes)
+            Highest on <strong>{peakDayTitle}</strong> (Single-day tickets generated)
           </div>
         </div>
 
-        {/* Metric 2: Season Pass Sold & People Multiplier */}
+        {/* Metric 2: Season Passes Attendance */}
         <div className="kpi-card highlight-gold">
           <div className="kpi-header">
             <span className="kpi-icon">👑</span>
             <span className="kpi-label">Season Passes Attendance</span>
           </div>
           <div className="kpi-value-row">
-            <span className="kpi-value">{seasonSummary.totalPeople}</span>
+            <span className="kpi-value">{seasonal.peopleCount}</span>
             <span className="kpi-unit">People / Night</span>
           </div>
           <div className="kpi-subtext">
-            <strong>{seasonSummary.totalSold}</strong> Pass{seasonSummary.totalSold !== 1 ? 'es' : ''} sold • Avg{' '}
-            <strong>{seasonSummary.avgPartySize}</strong> people per pass (admitted every day)
+            <strong>{seasonal.passCount}</strong> Season Pass{seasonal.passCount !== 1 ? 'es' : ''} sold • Valid across all 9 festival nights
           </div>
         </div>
 
-        {/* Metric 3: Total Admitted Check-ins so far */}
+        {/* Metric 3: Total Passes Generated */}
         <div className="kpi-card highlight-green">
           <div className="kpi-header">
-            <span className="kpi-icon">🎪</span>
-            <span className="kpi-label">Total People Checked In</span>
+            <span className="kpi-icon">🎟️</span>
+            <span className="kpi-label">Total Passes Generated</span>
           </div>
           <div className="kpi-value-row">
-            <span className="kpi-value">{totalAdmittedOverall}</span>
-            <span className="kpi-unit">Admitted to Date</span>
+            <span className="kpi-value">{totalPasses}</span>
+            <span className="kpi-unit">Passes Issued</span>
           </div>
           <div className="kpi-subtext">
-            Live turnstile headcount scanned through gates
+            Live database count across single, group, and seasonal passes
           </div>
         </div>
 
-        {/* Metric 4: Total Festival Footfall Capacity */}
+        {/* Metric 4: 9-Day Total Footfall Capacity */}
         <div className="kpi-card">
           <div className="kpi-header">
             <span className="kpi-icon">📊</span>
             <span className="kpi-label">9-Day Total Footfall Capacity</span>
           </div>
           <div className="kpi-value-row">
-            <span className="kpi-value">{totalCapacityAcrossDays}</span>
+            <span className="kpi-value">{totalFootfallCapacity}</span>
             <span className="kpi-unit">Cumulative Attendees</span>
           </div>
           <div className="kpi-subtext">
-            Combined sum across all 9 festival evenings
+            Combined sum across all 9 festival evenings ({totalPeople} total people entitled)
           </div>
         </div>
       </div>
 
-      {/* ── Season Pass Multiplier Callout Banner ── */}
-      {seasonSummary.totalSold > 0 && (
-        <div className="season-multiplier-banner">
-          <div className="season-multiplier-badge">🎟️ SEASON PASS MULTIPLIER</div>
-          <div className="season-multiplier-content">
-            <p>
-              <strong>{seasonSummary.totalSold} Season Pass{seasonSummary.totalSold !== 1 ? 'es' : ''}</strong> sold{' '}
-              covering a total of <strong>{seasonSummary.totalPeople} People</strong>. Because season passes give access to every festival night, they automatically contribute <strong>+{seasonSummary.totalPeople} attendees</strong> to each day&apos;s attendance capacity.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Interactive Visual Chart: Day-by-Day People Attending ── */}
+      {/* ── Interactive Visual Chart: 9 Day Candles + 1 Seasonal Candle ── */}
       <div className="analytics-chart-card">
         <div className="chart-header">
           <div>
-            <h3 className="chart-title">📊 Day-by-Day People Attending (Visual Comparison)</h3>
+            <h3 className="chart-title">
+              📊 Generated Attendance Candles (Single Days + Season Pass)
+            </h3>
             <p className="chart-subtitle">
-              Visual breakdown of Daily Single/Group Tickets (Purple) + Season Pass People (Gold).
+              9 Day Candles (SUM of party_size for Single passes) + 1 Dedicated Seasonal Pass Candle.
             </p>
           </div>
 
           <div className="chart-legend">
             <span className="legend-item">
               <span className="legend-color day-tickets-color" />
-              <span>Day Tickets People</span>
+              <span>Day Candle (Single Tickets)</span>
             </span>
             <span className="legend-item">
               <span className="legend-color season-tickets-color" />
-              <span>Season Pass People</span>
+              <span>Seasonal Candle (All Nights)</span>
             </span>
             <span className="legend-item">
-              <span className="legend-color admitted-marker-color" />
-              <span>Actual Admitted</span>
+              <span className="legend-color" style={{ background: '#10b981' }} />
+              <span>Active Night</span>
             </span>
           </div>
         </div>
 
-        {/* SVG Interactive Chart */}
+        {/* SVG Interactive Chart with 10 Candles */}
         <div className="svg-chart-wrapper">
-          <svg className="attendance-svg-chart" viewBox="0 0 900 240" preserveAspectRatio="none">
+          <svg className="attendance-svg-chart" viewBox="0 0 1020 250" preserveAspectRatio="none">
             {/* Horizontal guide lines */}
-            <line x1="40" y1="30" x2="880" y2="30" stroke="#f1f5f9" strokeDasharray="4 4" />
-            <line x1="40" y1="85" x2="880" y2="85" stroke="#f1f5f9" strokeDasharray="4 4" />
-            <line x1="40" y1="140" x2="880" y2="140" stroke="#f1f5f9" strokeDasharray="4 4" />
-            <line x1="40" y1="195" x2="880" y2="195" stroke="#e2e8f0" strokeWidth="1.5" />
+            <line x1="30" y1="35" x2="1000" y2="35" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="90" x2="1000" y2="90" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="145" x2="1000" y2="145" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="200" x2="1000" y2="200" stroke="#e2e8f0" strokeWidth="1.5" />
 
-            {/* Bars for each of the 9 days */}
+            {/* Subtle Divider between 9 Days and Seasonal Candle */}
+            <line x1="865" y1="20" x2="865" y2="235" stroke="#e2e8f0" strokeDasharray="3 3" strokeWidth="1.5" />
+
+            {/* ── 9 Day Candles ── */}
             {days.map((night, idx) => {
-              const barWidth = 60;
-              const spacing = 92;
-              const x = 50 + idx * spacing;
-              const chartHeight = 160;
+              const candleWidth = 58;
+              const spacing = 90;
+              const x = 40 + idx * spacing;
+              const chartHeight = 155;
+              const yBase = 200;
 
-              // Height calculations
-              const totalRatio = night.totalPeopleAttending / maxDayPeople;
-              const totalBarHeight = Math.max(8, totalRatio * chartHeight);
+              // Candle height proportional to max, minimum 4px baseline bar
+              const ratio = night.peopleCount / maxCandlePeople;
+              const candleHeight = night.peopleCount > 0
+                ? Math.max(12, ratio * chartHeight)
+                : 4;
+              const yTop = yBase - candleHeight;
 
-              const dayPassRatio = night.dayPassesPeople / maxDayPeople;
-              const dayPassHeight = Math.max(0, dayPassRatio * chartHeight);
-
-              const seasonRatio = night.seasonPassesPeople / maxDayPeople;
-              const seasonHeight = Math.max(0, seasonRatio * chartHeight);
-
-              const yBase = 195;
-              const yTop = yBase - totalBarHeight;
-
-              const isSelected = selectedDayId === night.nightId;
+              const isSelected = selectedNightId === night.nightId;
               const isToday = night.isActive;
 
               return (
                 <g
                   key={night.nightId}
-                  className={`chart-bar-group ${isSelected ? 'selected' : ''} ${isToday ? 'is-today' : ''}`}
-                  onClick={() => setSelectedDayId(selectedDayId === night.nightId ? null : night.nightId)}
+                  className={`chart-bar-group ${isSelected ? 'selected' : ''}`}
+                  onClick={() =>
+                    setSelectedNightId(
+                      selectedNightId === night.nightId ? null : night.nightId
+                    )
+                  }
                   style={{ cursor: 'pointer' }}
                 >
-                  {/* Active day background highlight */}
+                  {/* Active night background highlight */}
                   {isToday && (
                     <rect
-                      x={x - 8}
+                      x={x - 6}
                       y={20}
-                      width={barWidth + 16}
-                      height={185}
+                      width={candleWidth + 12}
+                      height={190}
                       rx="8"
                       fill="rgba(16, 185, 129, 0.08)"
                       stroke="#10b981"
@@ -260,93 +387,177 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
                     />
                   )}
 
-                  {/* Season pass segment (bottom or top) */}
-                  {seasonHeight > 0 && (
-                    <rect
-                      x={x}
-                      y={yBase - seasonHeight}
-                      width={barWidth}
-                      height={seasonHeight}
-                      rx="4"
-                      fill="#f59e0b"
-                      opacity={isSelected || !selectedDayId ? 1 : 0.45}
-                    />
-                  )}
+                  {/* Day Candle Body */}
+                  <rect
+                    x={x}
+                    y={yTop}
+                    width={candleWidth}
+                    height={candleHeight}
+                    rx="5"
+                    fill={isToday ? '#059669' : '#4c1d95'}
+                    opacity={isSelected || !selectedNightId ? 1 : 0.4}
+                  />
 
-                  {/* Day passes segment (stacked on top of season passes) */}
-                  {dayPassHeight > 0 && (
-                    <rect
-                      x={x}
-                      y={yBase - seasonHeight - dayPassHeight}
-                      width={barWidth}
-                      height={dayPassHeight}
-                      rx="4"
-                      fill="#4c1d95"
-                      opacity={isSelected || !selectedDayId ? 1 : 0.45}
-                    />
-                  )}
-
-                  {/* Total Value text over bar */}
+                  {/* Candle Value Text on Top */}
                   <text
-                    x={x + barWidth / 2}
+                    x={x + candleWidth / 2}
                     y={yTop - 8}
                     textAnchor="middle"
                     fontSize="13"
-                    fontWeight="700"
+                    fontWeight="800"
                     fill={isToday ? '#047857' : '#1e1b4b'}
                   >
-                    {night.totalPeopleAttending}
+                    {night.peopleCount}
                   </text>
 
-                  {/* Admitted checkmark badge if any admitted */}
-                  {night.actualAdmittedPeople > 0 && (
-                    <circle
-                      cx={x + barWidth - 6}
-                      cy={yTop - 6}
-                      r="5"
-                      fill="#10b981"
-                    />
-                  )}
-
-                  {/* Day Label */}
+                  {/* Day Title Label */}
                   <text
-                    x={x + barWidth / 2}
-                    y="214"
+                    x={x + candleWidth / 2}
+                    y="218"
                     textAnchor="middle"
                     fontSize="12"
                     fontWeight={isToday ? '800' : '600'}
-                    fill={isToday ? '#047857' : '#475569'}
+                    fill={isToday ? '#047857' : '#334155'}
                   >
                     {night.title}
                   </text>
 
-                  {/* Active / Date pill */}
+                  {/* Date / Active Tag */}
                   <text
-                    x={x + barWidth / 2}
-                    y="228"
+                    x={x + candleWidth / 2}
+                    y="233"
                     textAnchor="middle"
-                    fontSize="9.5"
+                    fontSize="10"
                     fill={isToday ? '#10b981' : '#94a3b8'}
                     fontWeight={isToday ? '700' : '500'}
                   >
-                    {isToday ? '● ACTIVE' : night.eventDate.slice(5)}
+                    {isToday ? '● ACTIVE' : night.eventDate ? night.eventDate.slice(5) : ''}
                   </text>
                 </g>
               );
             })}
+
+            {/* ── 1 Seasonal Candle ── */}
+            {(() => {
+              const candleWidth = 62;
+              const x = 890;
+              const chartHeight = 155;
+              const yBase = 200;
+
+              const ratio = seasonal.peopleCount / maxCandlePeople;
+              const candleHeight = seasonal.peopleCount > 0
+                ? Math.max(12, ratio * chartHeight)
+                : 4;
+              const yTop = yBase - candleHeight;
+              const isSelected = selectedNightId === 'seasonal_candle';
+
+              return (
+                <g
+                  key="seasonal_candle"
+                  className={`chart-bar-group ${isSelected ? 'selected' : ''}`}
+                  onClick={() =>
+                    setSelectedNightId(
+                      selectedNightId === 'seasonal_candle' ? null : 'seasonal_candle'
+                    )
+                  }
+                  style={{ cursor: 'pointer' }}
+                >
+                  {/* Seasonal Candle Body */}
+                  <rect
+                    x={x}
+                    y={yTop}
+                    width={candleWidth}
+                    height={candleHeight}
+                    rx="5"
+                    fill="#f59e0b"
+                    opacity={isSelected || !selectedNightId ? 1 : 0.4}
+                  />
+
+                  {/* Seasonal Value Text on Top */}
+                  <text
+                    x={x + candleWidth / 2}
+                    y={yTop - 8}
+                    textAnchor="middle"
+                    fontSize="13"
+                    fontWeight="800"
+                    fill="#b45309"
+                  >
+                    {seasonal.peopleCount}
+                  </text>
+
+                  {/* Seasonal Label */}
+                  <text
+                    x={x + candleWidth / 2}
+                    y="218"
+                    textAnchor="middle"
+                    fontSize="12"
+                    fontWeight="800"
+                    fill="#b45309"
+                  >
+                    Seasonal
+                  </text>
+
+                  {/* Subtitle */}
+                  <text
+                    x={x + candleWidth / 2}
+                    y="233"
+                    textAnchor="middle"
+                    fontSize="10"
+                    fill="#d97706"
+                    fontWeight="600"
+                  >
+                    All 9 Nights
+                  </text>
+                </g>
+              );
+            })()}
           </svg>
         </div>
 
-        {/* Selected Day Reset Button */}
-        {selectedDayId && (
-          <div className="filter-clear-row">
-            <span>Showing details for <strong>{days.find((d) => d.nightId === selectedDayId)?.title}</strong></span>
+        {/* Selected Candle Inspection Detail Card */}
+        {selectedNightId && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '14px 18px',
+              borderRadius: '10px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div>
+              {selectedNightId === 'seasonal_candle' ? (
+                <>
+                  <strong style={{ color: '#b45309' }}>👑 Seasonal Passes:</strong>{' '}
+                  <span>
+                    <strong>{seasonal.peopleCount} people</strong> across{' '}
+                    <strong>{seasonal.passCount} pass</strong>. Seasonal passes are valid for admission across all 9 festival nights and are not added into individual day candles.
+                  </span>
+                </>
+              ) : selectedDay ? (
+                <>
+                  <strong style={{ color: '#4c1d95' }}>📅 {selectedDay.title} ({selectedDay.eventDate}):</strong>{' '}
+                  <span>
+                    <strong>{selectedDay.peopleCount} people</strong> across{' '}
+                    <strong>{selectedDay.passCount} single pass{selectedDay.passCount !== 1 ? 'es' : ''}</strong>.
+                    {selectedDay.peopleCount === 0 && ' (No passes issued for this day yet)'}
+                  </span>
+                </>
+              ) : null}
+            </div>
+
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={() => setSelectedDayId(null)}
+              onClick={() => setSelectedNightId(null)}
+              style={{ fontSize: '0.82rem' }}
             >
-              ✕ Show All Days
+              ✕ Clear Selection
             </button>
           </div>
         )}
@@ -355,12 +566,11 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
       {/* ── Day-by-Day Cards Breakdown Grid ── */}
       <div className="day-breakdown-section">
         <h3 className="section-title">
-          📅 Detailed Attendance Breakdown per Day
-          {selectedDayId && ` (Filtered to 1 Day)`}
+          📅 Detailed Generated Passes by Festival Day
         </h3>
 
         <div className="days-cards-grid">
-          {displayedDays.map((night) => {
+          {days.map((night) => {
             const isToday = night.isActive;
 
             return (
@@ -368,7 +578,6 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
                 key={night.nightId}
                 className={`day-card ${isToday ? 'day-card-active' : ''}`}
               >
-                {/* Day Card Header */}
                 <div className="day-card-header">
                   <div>
                     <h4 className="day-card-title">{night.title}</h4>
@@ -378,135 +587,96 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
                   {isToday ? (
                     <span className="badge-active-day">● ACTIVE NOW</span>
                   ) : (
-                    <span className="badge-scheduled-day">Scheduled</span>
+                    <span className="badge-scheduled-day">Day {night.nightNumber}</span>
                   )}
                 </div>
 
-                {/* Big Total People Attending Stat */}
                 <div className="day-card-total-box">
                   <div className="total-people-headline">
-                    <span className="total-people-num">{night.totalPeopleAttending}</span>
-                    <span className="total-people-label">Total People Attending</span>
+                    <span className="total-people-num">{night.peopleCount}</span>
+                    <span className="total-people-label">Single Day Attendees</span>
                   </div>
 
-                  {/* Math Formula Breakdown (Exactly what user requested) */}
                   <div className="day-math-formula">
                     <div className="formula-line">
-                      <span className="formula-tag day-tag">Day Tickets:</span>{' '}
-                      <strong>{night.dayPassesCount}</strong> ticket{night.dayPassesCount !== 1 ? 's' : ''}{' '}
-                      covering <strong>{night.dayPassesPeople}</strong> people
-                      {night.groupPassesCount > 0 && (
-                        <span className="formula-subdetail">
-                          {' '}(inc. {night.groupPassesCount} group ticket{night.groupPassesCount !== 1 ? 's' : ''} = {night.groupPassesPeople} people)
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="formula-plus">+</div>
-
-                    <div className="formula-line">
-                      <span className="formula-tag season-tag">Season Passes:</span>{' '}
-                      <strong>{night.seasonPassesCount}</strong> pass{night.seasonPassesCount !== 1 ? 'es' : ''}{' '}
-                      covering <strong>{night.seasonPassesPeople}</strong> people
+                      <span className="formula-tag day-tag">Single Passes:</span>{' '}
+                      <strong>{night.passCount}</strong> ticket{night.passCount !== 1 ? 's' : ''}{' '}
+                      covering <strong>{night.peopleCount}</strong> {night.peopleCount === 1 ? 'person' : 'people'}
                     </div>
                   </div>
                 </div>
-
-                {/* Turnstile Check-in Progress Bar */}
-                <div className="turnstile-checkin-row">
-                  <div className="checkin-label-row">
-                    <span>Gate Check-ins</span>
-                    <span className="checkin-numbers">
-                      <strong>{night.actualAdmittedPeople}</strong> / {night.totalPeopleAttending} admitted ({night.admissionPercentage}%)
-                    </span>
-                  </div>
-                  <div className="checkin-progress-bar-bg">
-                    <div
-                      className="checkin-progress-bar-fill"
-                      style={{ width: `${Math.min(100, night.admissionPercentage)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Category Tags Breakdown */}
-                {Object.keys(night.categoryBreakdown).length > 0 && (
-                  <div className="day-category-pills">
-                    {Object.entries(night.categoryBreakdown).map(([cat, metric]) => (
-                      <span key={cat} className="category-pill">
-                        {cat.toUpperCase()}: <strong>{metric.people}p</strong> ({metric.count} tix)
-                      </span>
-                    ))}
-                    {night.seasonPassesPeople > 0 && (
-                      <span className="category-pill season-pill">
-                        SEASON: <strong>{night.seasonPassesPeople}p</strong>
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}
+
+          {/* Dedicated Seasonal Pass Card */}
+          <div
+            className="day-card"
+            style={{
+              borderColor: '#fde68a',
+              background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)',
+            }}
+          >
+            <div className="day-card-header">
+              <div>
+                <h4 className="day-card-title" style={{ color: '#b45309' }}>👑 Season Passes</h4>
+                <span className="day-card-date">All 9 Festival Nights</span>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#ffffff',
+                  background: '#f59e0b',
+                  padding: '3px 8px',
+                  borderRadius: '9999px',
+                }}
+              >
+                FULL ACCESS
+              </span>
+            </div>
+
+            <div className="day-card-total-box">
+              <div className="total-people-headline">
+                <span className="total-people-num" style={{ color: '#b45309' }}>
+                  {seasonal.peopleCount}
+                </span>
+                <span className="total-people-label">People / Night</span>
+              </div>
+
+              <div className="day-math-formula">
+                <div className="formula-line">
+                  <span className="formula-tag" style={{ background: '#fef3c7', color: '#b45309' }}>
+                    Season Pass:
+                  </span>{' '}
+                  <strong>{seasonal.passCount}</strong> pass covering{' '}
+                  <strong>{seasonal.peopleCount}</strong> people admitted every night
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── Season Passes Detailed Registry ── */}
-      {seasonSummary.passes.length > 0 && (
-        <div className="season-registry-card">
-          <h4 className="season-registry-title">
-            👑 Active Season Passes Sold ({seasonSummary.totalSold} Passes • {seasonSummary.totalPeople} Total Attendees)
-          </h4>
-          <p className="season-registry-desc">
-            These passes are valid for entry across all eligible festival days.
-          </p>
-
-          <div className="season-table-wrapper">
-            <table className="season-table">
-              <thead>
-                <tr>
-                  <th>Passholder / Attendee</th>
-                  <th>Pass Code</th>
-                  <th>Category</th>
-                  <th>Party Size</th>
-                  <th>Total People Covered</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasonSummary.passes.map((sp) => (
-                  <tr key={sp.id}>
-                    <td>
-                      <strong>{sp.name || 'Anonymous Passholder'}</strong>
-                    </td>
-                    <td>
-                      <code>{sp.manualCode}</code>
-                    </td>
-                    <td>
-                      <span className="badge-category">{sp.category.toUpperCase()}</span>
-                    </td>
-                    <td>
-                      <strong>{sp.partySize}</strong> {sp.partySize === 1 ? 'person' : 'people'} / ticket
-                    </td>
-                    <td className="people-cell">
-                      <span className="people-badge">+{sp.partySize} people / day</span>
-                    </td>
-                    <td>
-                      <span className="badge-status-valid">{sp.status.toUpperCase()}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Unassigned Legacy Tickets Note (if any exist) ── */}
-      {unassignedPassesCount > 0 && (
-        <div className="unassigned-note-card">
-          <span className="unassigned-icon">ℹ️</span>
+      {/* ── Unassigned Legacy Passes Note (if present) ── */}
+      {unassigned.passCount > 0 && (
+        <div
+          style={{
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            padding: '14px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            fontSize: '0.88rem',
+            color: '#475569',
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>ℹ️</span>
           <div>
-            <strong>Flexible / Legacy Passes ({unassignedPassesCount} tickets • {unassignedPassesPeople} people):</strong>{' '}
-            These pre-existing passes do not have a fixed single day assigned yet, and can be used on any open day.
+            <strong>Flexible / Legacy Passes ({unassigned.passCount} tickets • {unassigned.peopleCount} people):</strong>{' '}
+            Pre-existing passes issued before day-specific assignment. Can be used on any active event night.
           </div>
         </div>
       )}

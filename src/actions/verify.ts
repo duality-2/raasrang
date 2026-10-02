@@ -142,10 +142,10 @@ export async function admitPassAction(
     };
   }
 
-  if (peopleCount < 1 || peopleCount > 10) {
+  if (peopleCount < 1 || !Number.isInteger(peopleCount)) {
     return {
       status: 'ERROR',
-      message: 'People count must be between 1 and 10.',
+      message: 'People count must be a whole number of at least 1.',
     };
   }
 

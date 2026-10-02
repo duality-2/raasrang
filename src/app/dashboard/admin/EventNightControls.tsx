@@ -20,8 +20,6 @@ export default function EventNightControls({ nights }: EventNightControlsProps) 
     setLoadingId(null);
   };
 
-  const activeNight = nights.find(n => n.is_active);
-
   const handleSeed = async () => {
     setLoadingId('seed');
     const result = await seedEventNights();

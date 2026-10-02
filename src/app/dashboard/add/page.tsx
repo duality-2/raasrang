@@ -19,9 +19,7 @@ export default function AddAttendeePage() {
 
   // Ticket configuration state
   const [ticketType, setTicketType] = useState<TicketType>('single');
-  const [partySize, setPartySize] = useState<number>(1);
-  const [startNight, setStartNight] = useState<string>('night_1');
-  const [nightsCount, setNightsCount] = useState<number>(9);
+  const [partySize, setPartySize] = useState<number | string>(1);
   
   // Phone input state for +91 prefix restriction
   const [phoneInput, setPhoneInput] = useState('');
@@ -36,10 +34,6 @@ export default function AddAttendeePage() {
     getEventNights()
       .then((nights) => {
         setEventNights(nights);
-        if (nights.length > 0) {
-          setStartNight(nights[0].id);
-          setNightsCount(nights.length);
-        }
       })
       .catch(() => {});
   }, []);
@@ -158,71 +152,46 @@ export default function AddAttendeePage() {
             <input type="hidden" name="ticket_type" value={ticketType} />
           </div>
 
-          {/* ── 2. Party Size (1 to 10 People) ── */}
+          {/* ── 2. Typable Party Size (Minimum 1, No Upper Limit) ── */}
           <div className="form-group">
             <label htmlFor="party_size" className="form-label">
               Party Size (Attendees per admission)<span className="form-required">*</span>
             </label>
-            <div
-              style={{
-                display: 'flex',
-                gap: '8px',
-                overflowX: 'auto',
-                paddingBottom: '4px',
-                marginTop: '4px',
+            <input
+              id="party_size"
+              name="party_size"
+              type="number"
+              min="1"
+              step="1"
+              className={`form-input ${fieldErrors.party_size ? 'error' : ''}`}
+              value={partySize}
+              onChange={(e) => {
+                const val = e.target.value;
+                setPartySize(val === '' ? '' : parseInt(val, 10) || 1);
               }}
-            >
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setPartySize(num)}
-                  disabled={loading || success}
-                  style={{
-                    flex: '1 0 42px',
-                    height: '42px',
-                    borderRadius: '6px',
-                    border: partySize === num ? '2px solid #7c3aed' : '1px solid #d1d5db',
-                    background: partySize === num ? '#7c3aed' : '#ffffff',
-                    color: partySize === num ? '#ffffff' : '#1f2937',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {num}
-                </button>
-              ))}
-            </div>
-            <input type="hidden" name="party_size" value={partySize} />
+              placeholder="e.g. 1, 2, 5, 20, 50"
+              required
+              disabled={loading || success}
+              style={{ fontSize: '1.05rem', fontWeight: 600, padding: '10px 14px' }}
+            />
+            {fieldErrors.party_size && (
+              <div className="form-error">{fieldErrors.party_size}</div>
+            )}
             <div className="form-hint" style={{ marginTop: '4px' }}>
-              {partySize === 1
+              {Number(partySize) === 1
                 ? 'Individual ticket (1 person)'
-                : `Group ticket: allows up to ${partySize} people${
+                : `Group ticket: allows up to ${partySize || 1} people${
                     ticketType === 'seasonal' ? ' per eligible night' : ' total'
                   }`}
             </div>
           </div>
 
-          {/* ── 3. Seasonal Schedule Options ── */}
+          {/* ── 3. Seasonal Schedule Options (Hidden Defaults) ── */}
           {ticketType === 'seasonal' && (
-            <div
-              style={{
-                background: 'rgba(123, 45, 142, 0.04)',
-                border: '1px solid rgba(123, 45, 142, 0.2)',
-                borderRadius: '8px',
-                padding: '14px',
-                marginBottom: '16px',
-              }}
-            >
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.92rem', color: '#6b21a8' }}>
-                Seasonal Pass Validity (All 9 Nights of Navratri)
-              </h4>
-              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>
-                This pass will automatically be valid for all 9 nights of the event, resetting every night.
-              </p>
+            <>
               <input type="hidden" name="seasonal_start_night_id" value="night_1" />
               <input type="hidden" name="seasonal_nights_count" value="9" />
-            </div>
+            </>
           )}
 
           {/* ── 3b. Single Ticket Options ── */}

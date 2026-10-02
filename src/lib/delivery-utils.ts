@@ -111,3 +111,17 @@ export function isAutomatedWhatsAppBlocked(): { blocked: boolean; reason: string
     reason: 'Automated WhatsApp Cloud API delivery is BLOCKED pending verified Meta Business Account, approved template, and webhook credentials.',
   };
 }
+
+// Backwards compatibility aliases for delivery unit tests
+export const validateInternationalPhone = async (phone: string) => validateIndianPhone(phone);
+export async function getWhatsAppShareText(pass: Pass): Promise<string> {
+  const isSeasonal = pass.ticket_type === 'seasonal';
+  return (
+    `*Attendee:* ${pass.name || 'Passholder'}\n` +
+    `*Code:* ${pass.manual_code}\n` +
+    `*Party Allowance:* ${pass.party_size || 1} Persons\n` +
+    `${isSeasonal ? `*Type:* Seasonal Pass (${pass.seasonal_nights_count || 9} Nights)\n` : '*Type:* Single Ticket\n'}` +
+    `Attach the official PDF ticket when sharing.`
+  );
+}
+

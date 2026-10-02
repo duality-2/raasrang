@@ -31,11 +31,9 @@ export default async function AdminPage() {
       </header>
 
       {/* ── Real-Time Attendance Analytics & Capacity Visuals (Admin Profile Only) ── */}
-      {metrics && (
-        <section style={{ marginBottom: '36px' }}>
-          <AttendanceAnalytics initialData={metrics} />
-        </section>
-      )}
+      <section style={{ marginBottom: '36px' }}>
+        <AttendanceAnalytics initialData={metrics} />
+      </section>
 
       {/* ── Event Nights & Day Activation Controls ── */}
       <section className="card">

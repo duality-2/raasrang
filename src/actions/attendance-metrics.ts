@@ -3,71 +3,55 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireOrganiser } from '@/lib/auth';
 
-export interface CategoryMetric {
-  count: number;
-  people: number;
-}
-
-export interface DayAttendanceMetrics {
+export interface DayCandle {
   nightId: string;
   nightNumber: number;
   title: string;
   eventDate: string;
   isActive: boolean;
-  // Day-specific single/group tickets
-  dayPassesCount: number;
-  dayPassesPeople: number;
-  groupPassesCount: number;
-  groupPassesPeople: number;
-  singlePassesCount: number;
-  singlePassesPeople: number;
-  vipPassesCount: number;
-  vipPassesPeople: number;
-  categoryBreakdown: Record<string, CategoryMetric>;
-  // Season passes eligible on this day
-  seasonPassesCount: number;
-  seasonPassesPeople: number;
-  // Combined Grand Total for this Day
-  totalPeopleAttending: number;
-  // Live admissions recorded at the gates
-  actualAdmittedPeople: number;
-  admissionPercentage: number;
+  peopleCount: number; // SUM(party_size) over SINGLE passes whose valid_night_id is that day
+  passCount: number;
 }
 
-export interface SeasonPassItem {
-  id: string;
-  name: string | null;
-  manualCode: string;
-  category: string;
-  partySize: number;
-  status: string;
-  startNightId: string | null;
-  nightsCount: number;
+export type DayAttendanceMetrics = DayCandle;
+
+export interface SeasonalCandle {
+  peopleCount: number; // SUM(party_size) over ALL seasonal passes
+  passCount: number;
 }
 
-export interface SeasonPassSummary {
-  totalSold: number;
-  totalPeople: number;
-  avgPartySize: number;
-  categoryBreakdown: Record<string, CategoryMetric>;
-  passes: SeasonPassItem[];
+export interface UnassignedCandle {
+  peopleCount: number; // SUM(party_size) over single passes with valid_night_id IS NULL
+  passCount: number;
+}
+
+interface RpcDayItem {
+  night_id: string;
+  night_number: number;
+  title: string;
+  event_date: string;
+  is_active: boolean;
+  people_count: number;
+  pass_count: number;
 }
 
 export interface OverallAttendanceMetrics {
-  days: DayAttendanceMetrics[];
-  seasonSummary: SeasonPassSummary;
-  unassignedPassesCount: number;
-  unassignedPassesPeople: number;
+  days: DayCandle[];
+  seasonal: SeasonalCandle;
+  unassigned: UnassignedCandle;
+  totalPasses: number; // Count of all non-cancelled passes (119)
+  totalPeople: number; // Sum of party_size across all non-cancelled passes (218)
   peakDayTitle: string;
   peakDayPeople: number;
-  totalCapacityAcrossDays: number;
-  totalUniquePasses: number;
-  totalAdmittedOverall: number;
+  totalFootfallCapacity: number; // 9-day footfall capacity: single passes + 9 * seasonal
   lastUpdated: string;
+  syncSource: 'database_rpc' | 'database_query';
 }
 
 /**
- * Server action to calculate comprehensive attendance and footfall metrics.
+ * Server action to calculate comprehensive attendance and footfall metrics
+ * computed from tickets GENERATED (the passes table), not from scans.
+ *
  * Restricted to Organisers / Admins.
  */
 export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics | null> {
@@ -78,7 +62,65 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
 
   const admin = createAdminClient();
 
-  // 1. Fetch all event nights
+  // 1. Attempt database-level aggregation via RPC (from migration 006)
+  try {
+    const { data: rpcData, error: rpcError } = await admin.rpc(
+      'get_attendance_chart_metrics'
+    );
+
+    if (!rpcError && rpcData && Array.isArray(rpcData.days)) {
+      const days: DayCandle[] = (rpcData.days as RpcDayItem[]).map((d) => ({
+        nightId: d.night_id,
+        nightNumber: d.night_number,
+        title: d.title,
+        eventDate: d.event_date,
+        isActive: Boolean(d.is_active),
+        peopleCount: Number(d.people_count) || 0,
+        passCount: Number(d.pass_count) || 0,
+      }));
+
+      const seasonal: SeasonalCandle = {
+        peopleCount: Number(rpcData.seasonal?.people_count) || 0,
+        passCount: Number(rpcData.seasonal?.pass_count) || 0,
+      };
+
+      const unassigned: UnassignedCandle = {
+        peopleCount: Number(rpcData.unassigned?.people_count) || 0,
+        passCount: Number(rpcData.unassigned?.pass_count) || 0,
+      };
+
+      let peakDayPeople = 0;
+      let peakDayTitle = 'None';
+      days.forEach((d) => {
+        if (d.peopleCount > peakDayPeople) {
+          peakDayPeople = d.peopleCount;
+          peakDayTitle = d.title;
+        }
+      });
+
+      const singleDaysTotal = days.reduce((sum, d) => sum + d.peopleCount, 0);
+      const totalFootfallCapacity = singleDaysTotal + seasonal.peopleCount * 9;
+
+      return {
+        days,
+        seasonal,
+        unassigned,
+        totalPasses: Number(rpcData.total_passes) || 0,
+        totalPeople: Number(rpcData.total_people) || 0,
+        peakDayTitle,
+        peakDayPeople,
+        totalFootfallCapacity,
+        lastUpdated: new Date().toISOString(),
+        syncSource: 'database_rpc',
+      };
+    }
+  } catch {
+    // If RPC does not exist (migration 006 unapplied on production Supabase),
+    // proceed to graceful server-side DB aggregation below.
+  }
+
+  // 2. Server-side Database Aggregation Fallback
+  // Fetch event nights configuration (ordered by night_number)
   const { data: nightsData, error: nightsError } = await admin
     .from('event_nights')
     .select('id, night_number, title, event_date, is_active')
@@ -89,10 +131,10 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
     return null;
   }
 
-  // 2. Fetch all passes (excluding cancelled)
+  // Fetch only non-cancelled passes with minimal necessary fields
   const { data: passesData, error: passesError } = await admin
     .from('passes')
-    .select('id, name, manual_code, category, status, ticket_type, party_size, valid_night_id, seasonal_start_night_id, seasonal_nights_count')
+    .select('id, ticket_type, party_size, valid_night_id, status')
     .neq('status', 'cancelled');
 
   if (passesError || !passesData) {
@@ -100,211 +142,77 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
     return null;
   }
 
-  // 3. Fetch seasonal pass eligible nights junction table
-  const { data: eligibleNightsData } = await admin
-    .from('pass_eligible_nights')
-    .select('pass_id, event_night_id');
-
-  // Map pass_id -> Set of eligible event_night_ids
-  const passEligibleMap = new Map<string, Set<string>>();
-  if (eligibleNightsData) {
-    eligibleNightsData.forEach((row) => {
-      if (!passEligibleMap.has(row.pass_id)) {
-        passEligibleMap.set(row.pass_id, new Set());
-      }
-      passEligibleMap.get(row.pass_id)!.add(row.event_night_id);
-    });
-  }
-
-  // 4. Fetch all successful admissions
-  const { data: admissionsData } = await admin
-    .from('admissions')
-    .select('id, event_night_id, people_count');
-
-  // Map event_night_id -> total people admitted
-  const admissionsByNight = new Map<string, number>();
-  let totalAdmittedOverall = 0;
-  if (admissionsData) {
-    admissionsData.forEach((adm) => {
-      const count = adm.people_count || 1;
-      totalAdmittedOverall += count;
-      if (adm.event_night_id) {
-        admissionsByNight.set(
-          adm.event_night_id,
-          (admissionsByNight.get(adm.event_night_id) || 0) + count
-        );
-      }
-    });
-  }
-
-  // Separate single day tickets vs season passes
   const singlePasses = passesData.filter((p) => p.ticket_type !== 'seasonal');
   const seasonalPasses = passesData.filter((p) => p.ticket_type === 'seasonal');
 
-  // ── Season Pass Summary ──
-  let totalSeasonPeople = 0;
-  const seasonCatMap: Record<string, CategoryMetric> = {};
-  const seasonItems: SeasonPassItem[] = [];
+  // Compute 9 Day Candles: SUM(party_size) over SINGLE passes where valid_night_id is that day
+  let peakDayPeople = 0;
+  let peakDayTitle = 'None';
+  let totalSingleDayPeople = 0;
 
-  seasonalPasses.forEach((sp) => {
-    const size = sp.party_size || 1;
-    totalSeasonPeople += size;
-
-    const cat = sp.category || 'general';
-    if (!seasonCatMap[cat]) {
-      seasonCatMap[cat] = { count: 0, people: 0 };
-    }
-    seasonCatMap[cat].count += 1;
-    seasonCatMap[cat].people += size;
-
-    seasonItems.push({
-      id: sp.id,
-      name: sp.name,
-      manualCode: sp.manual_code,
-      category: sp.category,
-      partySize: size,
-      status: sp.status,
-      startNightId: sp.seasonal_start_night_id,
-      nightsCount: sp.seasonal_nights_count || 9,
-    });
-  });
-
-  const seasonSummary: SeasonPassSummary = {
-    totalSold: seasonalPasses.length,
-    totalPeople: totalSeasonPeople,
-    avgPartySize:
-      seasonalPasses.length > 0
-        ? Math.round((totalSeasonPeople / seasonalPasses.length) * 10) / 10
-        : 0,
-    categoryBreakdown: seasonCatMap,
-    passes: seasonItems,
-  };
-
-  // ── Day by Day Breakdown ──
-  const daysMetrics: DayAttendanceMetrics[] = [];
-  let peakPeople = 0;
-  let peakTitle = 'None';
-  let totalCapacityAllDays = 0;
-
-  nightsData.forEach((night) => {
-    // 1. Day tickets matching this night
+  const days: DayCandle[] = nightsData.map((night) => {
     const nightSingles = singlePasses.filter((p) => p.valid_night_id === night.id);
-    const dayPassesCount = nightSingles.length;
-    let dayPassesPeople = 0;
-    let groupPassesCount = 0;
-    let groupPassesPeople = 0;
-    let singlePassesCount = 0;
-    let singlePassesPeople = 0;
-    let vipPassesCount = 0;
-    let vipPassesPeople = 0;
-    const catMap: Record<string, CategoryMetric> = {};
-
-    nightSingles.forEach((p) => {
-      const size = p.party_size || 1;
-      dayPassesPeople += size;
-
-      if (p.category === 'group' || size > 1) {
-        groupPassesCount += 1;
-        groupPassesPeople += size;
-      } else {
-        singlePassesCount += 1;
-        singlePassesPeople += size;
-      }
-
-      if (p.category === 'vip') {
-        vipPassesCount += 1;
-        vipPassesPeople += size;
-      }
-
-      const cat = p.category || 'general';
-      if (!catMap[cat]) {
-        catMap[cat] = { count: 0, people: 0 };
-      }
-      catMap[cat].count += 1;
-      catMap[cat].people += size;
-    });
-
-    // 2. Season passes eligible for this specific night
-    const eligibleSeasonals = seasonalPasses.filter((sp) => {
-      // Check junction table first
-      const set = passEligibleMap.get(sp.id);
-      if (set && set.has(night.id)) {
-        return true;
-      }
-      // Fallback: check contiguous night range
-      const startNum = parseInt(
-        sp.seasonal_start_night_id?.replace('night_', '') || '1',
-        10
-      );
-      const count = sp.seasonal_nights_count || 9;
-      return (
-        night.night_number >= startNum && night.night_number < startNum + count
-      );
-    });
-
-    const seasonPassesCount = eligibleSeasonals.length;
-    const seasonPassesPeople = eligibleSeasonals.reduce(
-      (sum, sp) => sum + (sp.party_size || 1),
+    const passCount = nightSingles.length;
+    const peopleCount = nightSingles.reduce(
+      (sum, p) => sum + (p.party_size || 1),
       0
     );
 
-    // 3. Combined Total People Attending on this day
-    const totalPeopleAttending = dayPassesPeople + seasonPassesPeople;
-    totalCapacityAllDays += totalPeopleAttending;
+    totalSingleDayPeople += peopleCount;
 
-    if (totalPeopleAttending > peakPeople) {
-      peakPeople = totalPeopleAttending;
-      peakTitle = night.title;
+    if (peopleCount > peakDayPeople) {
+      peakDayPeople = peopleCount;
+      peakDayTitle = night.title;
     }
 
-    // 4. Actual Admitted People for this day
-    const actualAdmittedPeople = admissionsByNight.get(night.id) || 0;
-    const admissionPercentage =
-      totalPeopleAttending > 0
-        ? Math.min(100, Math.round((actualAdmittedPeople / totalPeopleAttending) * 100))
-        : 0;
-
-    daysMetrics.push({
+    return {
       nightId: night.id,
       nightNumber: night.night_number,
       title: night.title,
       eventDate: night.event_date,
       isActive: Boolean(night.is_active),
-      dayPassesCount,
-      dayPassesPeople,
-      groupPassesCount,
-      groupPassesPeople,
-      singlePassesCount,
-      singlePassesPeople,
-      vipPassesCount,
-      vipPassesPeople,
-      categoryBreakdown: catMap,
-      seasonPassesCount,
-      seasonPassesPeople,
-      totalPeopleAttending,
-      actualAdmittedPeople,
-      admissionPercentage,
-    });
+      peopleCount,
+      passCount,
+    };
   });
 
-  // ── Unassigned Legacy Single Tickets ──
-  const unassignedSingles = singlePasses.filter((p) => !p.valid_night_id);
-  const unassignedPassesCount = unassignedSingles.length;
-  const unassignedPassesPeople = unassignedSingles.reduce(
+  // Compute 1 Seasonal Candle: SUM(party_size) over ALL seasonal passes
+  const seasonalPeople = seasonalPasses.reduce(
     (sum, p) => sum + (p.party_size || 1),
     0
   );
+  const seasonal: SeasonalCandle = {
+    peopleCount: seasonalPeople,
+    passCount: seasonalPasses.length,
+  };
+
+  // Compute Unassigned Candle: SINGLE passes without valid_night_id
+  const unassignedSingles = singlePasses.filter((p) => !p.valid_night_id);
+  const unassigned: UnassignedCandle = {
+    peopleCount: unassignedSingles.reduce(
+      (sum, p) => sum + (p.party_size || 1),
+      0
+    ),
+    passCount: unassignedSingles.length,
+  };
+
+  const totalPasses = passesData.length;
+  const totalPeople = passesData.reduce(
+    (sum, p) => sum + (p.party_size || 1),
+    0
+  );
+  const totalFootfallCapacity = totalSingleDayPeople + seasonalPeople * 9;
 
   return {
-    days: daysMetrics,
-    seasonSummary,
-    unassignedPassesCount,
-    unassignedPassesPeople,
-    peakDayTitle: peakTitle,
-    peakDayPeople: peakPeople,
-    totalCapacityAcrossDays: totalCapacityAllDays,
-    totalUniquePasses: passesData.length,
-    totalAdmittedOverall,
+    days,
+    seasonal,
+    unassigned,
+    totalPasses,
+    totalPeople,
+    peakDayTitle,
+    peakDayPeople,
+    totalFootfallCapacity,
     lastUpdated: new Date().toISOString(),
+    syncSource: 'database_query',
   };
 }

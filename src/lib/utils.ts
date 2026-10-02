@@ -90,7 +90,10 @@ export function isValidEmail(email: string): boolean {
  * Phone validation: 10 digits for Indian mobile numbers.
  */
 export function isValidPhone(phone: string): boolean {
-  const digits = phone.replace(/[^0-9]/g, '');
+  let digits = phone.replace(/[^0-9]/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  }
   return /^[6-9]\d{9}$/.test(digits);
 }
 
@@ -151,13 +154,18 @@ export function validatePassInput(input: {
     errors.ticket_type = 'Ticket type must be single or seasonal.';
   }
 
-  // Party Size (1 to 10)
-  const rawPartySize = Number(input.party_size ?? 1);
+  // Party Size: minimum 1, whole numbers only, no upper limit
   let party_size = 1;
-  if (isNaN(rawPartySize) || rawPartySize < 1 || rawPartySize > 10) {
-    errors.party_size = 'Party size must be between 1 and 10.';
+  const rawPartyInput = input.party_size ?? 1;
+  if (typeof rawPartyInput === 'string' && rawPartyInput.trim() === '') {
+    errors.party_size = 'Party size is required and must be at least 1.';
   } else {
-    party_size = Math.floor(rawPartySize);
+    const rawPartySize = Number(rawPartyInput);
+    if (isNaN(rawPartySize) || !Number.isInteger(rawPartySize) || rawPartySize < 1) {
+      errors.party_size = 'Party size must be a whole number of at least 1.';
+    } else {
+      party_size = rawPartySize;
+    }
   }
 
   // Category (optional when generating tickets; safely defaults for database constraint)
@@ -188,13 +196,16 @@ export function validatePassInput(input: {
     valid_night_id = null;
   } else {
     // Single Ticket requirement
-    valid_night_id = (input.valid_night_id ?? '').trim();
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-    if (!valid_night_id) {
-      errors.valid_night_id = 'A valid event night must be selected for a single ticket.';
-    } else if (!uuidRegex.test(valid_night_id) && !valid_night_id.startsWith('night_')) {
-      errors.valid_night_id = 'Invalid event night selection.';
+    const rawNight = (input.valid_night_id ?? '').trim();
+    if (rawNight) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(rawNight) && !rawNight.startsWith('night_')) {
+        errors.valid_night_id = 'Invalid event night selection.';
+      } else {
+        valid_night_id = rawNight;
+      }
+    } else {
+      valid_night_id = null;
     }
   }
 
@@ -216,7 +227,10 @@ export function validatePassInput(input: {
     if (!isValidPhone(rawPhone)) {
       errors.phone = 'Invalid Indian mobile number (must be 10 digits).';
     } else {
-      const digits = rawPhone.replace(/[^0-9]/g, '');
+      let digits = rawPhone.replace(/[^0-9]/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) {
+        digits = digits.slice(2);
+      }
       phone = '+91' + digits; // Normalize to E.164 format
     }
   }

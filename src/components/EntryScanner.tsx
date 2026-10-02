@@ -615,43 +615,106 @@ export default function EntryScanner({ userRole }: EntryScannerProps) {
             </div>
           </div>
 
-          {/* Group Count Selector (1 to remaining) */}
+          {/* Typable Admission Count (no 1-10 cap, up to remaining allowance) */}
           <div className="gate-count-section">
-            <div className="gate-count-label">
+            <label htmlFor="gate_admit_count_input" className="gate-count-label">
               {(preview.remaining_count ?? 1) > 1
-                ? 'Select number of people entering now:'
+                ? `Type number of people entering now (Max: ${preview.remaining_count ?? 1}):`
                 : 'Confirm person entering now:'}
+            </label>
+
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
+              <input
+                id="gate_admit_count_input"
+                type="number"
+                min={1}
+                max={preview.remaining_count ?? 1}
+                step={1}
+                value={selectedCount ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  if (val === '') {
+                    setSelectedCount(null);
+                  } else {
+                    const parsed = parseInt(val, 10);
+                    setSelectedCount(isNaN(parsed) ? null : parsed);
+                  }
+                }}
+                placeholder={`1 - ${preview.remaining_count ?? 1}`}
+                className="form-input"
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  padding: '10px 14px',
+                  maxWidth: '180px',
+                  borderRadius: '8px',
+                }}
+                autoFocus
+              />
+
+              {(preview.remaining_count ?? 1) > 1 && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setSelectedCount(1)}
+                  >
+                    Admit 1
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setSelectedCount(preview.remaining_count ?? 1)}
+                  >
+                    Admit All ({preview.remaining_count ?? 1})
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="gate-count-grid">
-              {Array.from(
-                { length: preview.remaining_count ?? 1 },
-                (_, i) => i + 1
-              ).map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  className={`gate-count-btn ${selectedCount === num ? 'active' : ''}`}
-                  onClick={() => setSelectedCount(num)}
-                >
-                  {num}
-                </button>
-              ))}
-            </div>
+            {selectedCount !== null && (
+              <>
+                {selectedCount < 1 && (
+                  <div className="form-error" style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+                    Number of people must be at least 1.
+                  </div>
+                )}
+                {selectedCount > (preview.remaining_count ?? 1) && (
+                  <div className="form-error" style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+                    Cannot exceed remaining allowance ({preview.remaining_count ?? 1} people).
+                  </div>
+                )}
+                {!Number.isInteger(selectedCount) && (
+                  <div className="form-error" style={{ fontSize: '0.85rem', marginTop: '4px' }}>
+                    Whole numbers only.
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="gate-preview-actions">
             <button
               type="button"
               className="gate-admit-btn"
-              disabled={!selectedCount || isProcessing}
+              disabled={
+                !selectedCount ||
+                selectedCount < 1 ||
+                selectedCount > (preview.remaining_count ?? 1) ||
+                !Number.isInteger(selectedCount) ||
+                isProcessing
+              }
               onClick={handleConfirmAdmission}
             >
-              {selectedCount
+              {selectedCount &&
+              selectedCount >= 1 &&
+              selectedCount <= (preview.remaining_count ?? 1) &&
+              Number.isInteger(selectedCount)
                 ? `Confirm Admission of ${selectedCount} ${
                     selectedCount === 1 ? 'Person' : 'People'
                   } →`
-                : 'Select Count Above to Admit'}
+                : 'Enter Valid Count Above to Admit'}
             </button>
             <button
               type="button"

@@ -8,7 +8,7 @@ interface PhysicalTicketCardProps {
   pass: Pass;
   ticketNumber?: number;
   isTestBatch?: boolean;
-  night?: any;
+  night?: { title?: string; event_date?: string } | null;
 }
 
 /**
