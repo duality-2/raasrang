@@ -98,28 +98,28 @@ function initFallbackAudio(): void {
     passFallbackAudio = new Audio(passUri);
     passFallbackAudio.preload = 'auto';
 
-    // 2. Synthesize Reject Buzzer (dual alert pulses)
-    const durReject = 0.44;
+    // 2. Synthesize Standard Clean Rejection Sound (classic double negative beep)
+    const durReject = 0.35;
     const rejectSamples = new Float32Array(Math.floor(sr * durReject));
-    function addRejectPulse(start: number, dur: number, freq1: number, freq2: number) {
+    const rejectPulses = [
+      { freq: 260, start: 0, dur: 0.12 },
+      { freq: 200, start: 0.15, dur: 0.18 },
+    ];
+    rejectPulses.forEach(({ freq, start, dur }) => {
       const startIdx = Math.floor(start * sr);
       const endIdx = Math.min(rejectSamples.length, Math.floor((start + dur) * sr));
       for (let i = startIdx; i < endIdx; i++) {
         const t = (i - startIdx) / sr;
-        const progress = t / dur;
-        const currentFreq = freq1 + (freq2 - freq1) * progress;
-        const env = Math.exp(-progress * 4.2);
-        const attack = Math.min(1, t / 0.015);
-        // Sawtooth harmonics for authoritative warning buzz
-        const saw =
-          Math.sin(2 * Math.PI * currentFreq * t) +
-          0.5 * Math.sin(2 * Math.PI * currentFreq * 2 * t) +
-          0.25 * Math.sin(2 * Math.PI * currentFreq * 3 * t);
-        rejectSamples[i] += saw * 0.32 * env * attack;
+        const attack = Math.min(1, t / 0.008);
+        const decay = Math.max(0, 1 - (t / dur));
+        const env = attack * Math.pow(decay, 0.7);
+        // Clean, normal tone
+        const wave =
+          Math.sin(2 * Math.PI * freq * t) * 0.75 +
+          Math.sin(2 * Math.PI * freq * 2 * t) * 0.25;
+        rejectSamples[i] += wave * env * 0.45;
       }
-    }
-    addRejectPulse(0, 0.16, 196, 175);
-    addRejectPulse(0.2, 0.22, 145, 95);
+    });
 
     const rejectUri = createWavDataUri(sr, rejectSamples);
     rejectFallbackAudio = new Audio(rejectUri);
@@ -293,8 +293,9 @@ export function playPassSound(customCtx?: AudioContext | null): void {
 }
 
 /**
- * Unique Festival Reject Sound:
- * Authoritative dual descending warning alert (Low C#3 → A2).
+ * Standard Scanner Rejection Sound:
+ * Classic, clean double negative tone (260 Hz → 200 Hz).
+ * Familiar, unmistakable "Access Denied" beep without harsh distortion.
  */
 export function playRejectSound(customCtx?: AudioContext | null): void {
   if (isMuted()) return;
@@ -302,7 +303,7 @@ export function playRejectSound(customCtx?: AudioContext | null): void {
   // Mobile double-buzz haptics
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
     try {
-      navigator.vibrate([160, 80, 220]);
+      navigator.vibrate([120, 60, 140]);
     } catch {
       /* ignore */
     }
@@ -319,38 +320,31 @@ export function playRejectSound(customCtx?: AudioContext | null): void {
 
       const now = ctx.currentTime;
       const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(0.95, now);
+      masterGain.gain.setValueAtTime(0.85, now);
       masterGain.connect(ctx.destination);
 
-      // Two punchy descending pulses
+      // Two clean, familiar negative beeps (260 Hz -> 200 Hz)
       const pulses = [
-        { startFreq: 155, endFreq: 110, start: 0, dur: 0.18 },
-        { startFreq: 145, endFreq: 95, start: 0.24, dur: 0.22 },
+        { freq: 260, start: 0, dur: 0.12 },
+        { freq: 200, start: 0.15, dur: 0.18 },
       ];
 
-      pulses.forEach(({ startFreq, endFreq, start, dur }) => {
+      pulses.forEach(({ freq, start, dur }) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sawtooth';
+        osc.type = 'triangle'; // Clean, warm, normal error tone
 
-        osc.frequency.setValueAtTime(startFreq, now + start);
-        osc.frequency.exponentialRampToValueAtTime(endFreq, now + start + dur);
+        osc.frequency.setValueAtTime(freq, now + start);
 
         gain.gain.setValueAtTime(0, now + start);
-        gain.gain.linearRampToValueAtTime(0.85, now + start + 0.015);
+        gain.gain.linearRampToValueAtTime(0.85, now + start + 0.008);
         gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
 
-        // Lowpass filter to give thick punch
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(650, now + start);
-
-        osc.connect(filter);
-        filter.connect(gain);
+        osc.connect(gain);
         gain.connect(masterGain);
 
         osc.start(now + start);
-        osc.stop(now + start + dur + 0.05);
+        osc.stop(now + start + dur + 0.02);
       });
 
       webAudioPlayed = true;
