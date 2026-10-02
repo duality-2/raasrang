@@ -3,6 +3,11 @@
 -- Ensures Start Day / End Day directly activate / deactivate tickets.
 -- ============================================================
 
+-- 0. Make scan_gate column in admissions nullable (since gate concept was removed)
+ALTER TABLE public.admissions ALTER COLUMN scan_gate DROP NOT NULL;
+ALTER TABLE public.admissions ALTER COLUMN scan_gate SET DEFAULT 'Main Gate';
+
+
 -- 1. Helper to get active night purely based on admin toggle
 CREATE OR REPLACE FUNCTION public.get_current_open_night()
 RETURNS RECORD
