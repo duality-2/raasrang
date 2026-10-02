@@ -120,3 +120,41 @@ export async function toggleEventNightStatus(id: string, isActive: boolean) {
     return { success: false, error: message };
   }
 }
+
+/**
+ * Seed the initial 9 event nights if the schedule is empty.
+ */
+export async function seedEventNights() {
+  const { user, authorized } = await requireOrganiser();
+  if (!authorized || !user) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const supabase = await createClient();
+    const rows = Array.from({ length: 9 }).map((_, i) => {
+      const num = i + 1;
+      const date = new Date(2026, 9, 3 + num); // Starts Oct 4
+      return {
+        id: `night_${num}`,
+        night_number: num,
+        title: `Day ${num}`,
+        event_date: date.toISOString().split('T')[0],
+        start_time: new Date(date.getTime() + 18 * 60 * 60 * 1000).toISOString(),
+        end_time: new Date(date.getTime() + 23.5 * 60 * 60 * 1000).toISOString(),
+        is_active: false
+      };
+    });
+
+    const { error } = await supabase.from('event_nights').insert(rows);
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    
+    revalidatePath('/dashboard/admin');
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}

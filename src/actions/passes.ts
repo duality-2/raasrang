@@ -92,7 +92,7 @@ export async function createPass(formData: FormData) {
           }),
     };
 
-    let { data, error } = await admin
+    const { data, error } = await admin
       .from('passes')
       .insert(fullPayload)
       .select('id')
@@ -104,22 +104,11 @@ export async function createPass(formData: FormData) {
       continue;
     }
 
-    // If failed due to missing 004 columns on live database, fallback to base payload
     if (error) {
-      console.warn('Initial pass insert failed, falling back to base schema:', error.message);
-      const fallbackRes = await admin
-        .from('passes')
-        .insert(basePayload)
-        .select('id')
-        .single();
-
-      if (!fallbackRes.error && fallbackRes.data) {
-        data = fallbackRes.data;
-        error = null;
-      }
+      return { error: `Database error: ${error.message}` };
     }
 
-    if (!error && data) {
+    if (data) {
       // If seasonal pass, link eligible consecutive event nights
       if (validatedData.ticket_type === 'seasonal') {
         const startNightNum = parseInt(

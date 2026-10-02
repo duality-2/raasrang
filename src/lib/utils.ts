@@ -250,13 +250,25 @@ export function validatePassInput(input: {
  * Format an ISO date string for display.
  */
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const date = new Date(iso);
+  
+  // Convert to IST (UTC+5:30)
+  const utc = date.getTime() + (date.getTimezoneOffset() * 60000);
+  const istTime = new Date(utc + (3600000 * 5.5));
+  
+  const day = String(istTime.getDate()).padStart(2, '0');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[istTime.getMonth()];
+  const year = istTime.getFullYear();
+  
+  let hours = istTime.getHours();
+  const minutes = String(istTime.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12; // the hour '0' should be '12'
+  const strHour = String(hours).padStart(2, '0');
+
+  return `${day} ${month} ${year} at ${strHour}:${minutes} ${ampm}`;
 }
 
 export interface PasswordValidationResult {
