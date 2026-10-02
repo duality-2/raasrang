@@ -40,7 +40,6 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
 
         const shareData = {
           title: 'RAAS RANG 2026 — Official Ticket',
-          text: shareText,
         };
 
         if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
@@ -165,7 +164,7 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
             className="btn btn-secondary btn-sm"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
           >
-            <span>Share with PDF...</span>
+            <span>Share PDF</span>
           </button>
         )}
 
