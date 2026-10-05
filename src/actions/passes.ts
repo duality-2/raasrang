@@ -25,6 +25,8 @@ export async function createPass(formData: FormData) {
     seasonal_nights_count: (formData.get('seasonal_nights_count') as string) || '9',
     valid_night_id: (formData.get('valid_night_id') as string) || undefined,
     idempotency_key: (formData.get('idempotency_key') as string) || undefined,
+    amount_received: (formData.get('amount_received') as string) ?? '',
+    payment_mode: (formData.get('payment_mode') as string) || undefined,
   };
 
   const validation = validatePassInput(input);
@@ -80,6 +82,8 @@ export async function createPass(formData: FormData) {
       ticket_type: validatedData.ticket_type,
       party_size: validatedData.party_size,
       validity_state: 'active',
+      amount_received: validatedData.amount_received,
+      payment_mode: validatedData.payment_mode,
       ...(validatedData.idempotency_key ? { idempotency_key: validatedData.idempotency_key } : {}),
       ...(validatedData.ticket_type === 'seasonal'
         ? {

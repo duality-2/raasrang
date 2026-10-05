@@ -55,6 +55,8 @@ test('Party size validation: accepts numbers up to 100 and rejects numbers > 100
   const res15 = validatePassInput({
     party_size: 15,
     valid_night_id: 'night_1',
+    amount_received: 100,
+    payment_mode: 'cash',
   });
   assert.strictEqual(res15.valid, true);
   assert.strictEqual(res15.data?.party_size, 15);
@@ -62,6 +64,8 @@ test('Party size validation: accepts numbers up to 100 and rejects numbers > 100
   const res50 = validatePassInput({
     party_size: '50',
     valid_night_id: 'night_1',
+    amount_received: 100,
+    payment_mode: 'cash',
   });
   assert.strictEqual(res50.valid, true);
   assert.strictEqual(res50.data?.party_size, 50);
@@ -69,6 +73,8 @@ test('Party size validation: accepts numbers up to 100 and rejects numbers > 100
   const res100 = validatePassInput({
     party_size: 100,
     valid_night_id: 'night_1',
+    amount_received: 100,
+    payment_mode: 'cash',
   });
   assert.strictEqual(res100.valid, true);
   assert.strictEqual(res100.data?.party_size, 100);

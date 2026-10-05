@@ -25,6 +25,8 @@ export type DeliveryStatus =
 
 export type ScanMethod = 'qr' | 'manual';
 
+export type PaymentMode = 'cash' | 'online';
+
 export type UserRole = 'admin' | 'scanner' | 'ticketer' | 'organiser';
 
 export interface Pass {
@@ -51,6 +53,9 @@ export interface Pass {
   validity_state?: ValidityState;
   idempotency_key?: string | null;
   issued_by?: string | null;
+  // Payment details captured at issuance (migration 007)
+  amount_received?: number | string | null;
+  payment_mode?: PaymentMode | null;
   // Scan detail fields
   scanned_by?: string | null;
   scan_method?: ScanMethod | null;
@@ -155,6 +160,8 @@ export interface CreatePassInput {
   seasonal_start_night_id?: string;
   seasonal_nights_count?: number;
   idempotency_key?: string;
+  amount_received?: number;
+  payment_mode?: PaymentMode;
 }
 
 /** Attendee list row — token is deliberately omitted, manual_code can be shown */

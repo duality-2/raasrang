@@ -73,6 +73,8 @@ test('validatePassInput handles both named attendees and unassigned physical tic
     category: 'stag_male',
     email: 'julie@example.com',
     phone: '+91 9876543210',
+    amount_received: '500',
+    payment_mode: 'online',
   });
   assert.strictEqual(named.valid, true);
   assert.strictEqual(named.data?.name, 'Julie Saxena');
@@ -83,6 +85,8 @@ test('validatePassInput handles both named attendees and unassigned physical tic
   // Unassigned physical ticket (name is optional/null)
   const unassigned = validatePassInput({
     category: 'vip',
+    amount_received: 0,
+    payment_mode: 'cash',
   });
   assert.strictEqual(unassigned.valid, true);
   assert.strictEqual(unassigned.data?.name, null);
@@ -93,6 +97,8 @@ test('validatePassInput handles both named attendees and unassigned physical tic
     name: 'Julie Saxena',
     phone: '+919876543210',
     party_size: 1,
+    amount_received: 300,
+    payment_mode: 'cash',
   });
   assert.strictEqual(noCatSingle.valid, true);
   assert.strictEqual(noCatSingle.data?.category, 'complimentary');
@@ -101,6 +107,8 @@ test('validatePassInput handles both named attendees and unassigned physical tic
     name: 'Sharma Family',
     phone: '+919876543210',
     party_size: 5,
+    amount_received: 1500,
+    payment_mode: 'online',
   });
   assert.strictEqual(noCatGroup.valid, true);
   assert.strictEqual(noCatGroup.data?.category, 'group');
@@ -127,6 +135,30 @@ test('validatePassInput handles both named attendees and unassigned physical tic
   });
   assert.strictEqual(badPhone.valid, false);
   assert.strictEqual(Boolean(badPhone.errors.phone), true);
+});
+
+test('validatePassInput requires and validates amount received and payment mode', () => {
+  const ok = validatePassInput({ name: 'Julie Saxena', amount_received: '499.5', payment_mode: 'Online' });
+  assert.strictEqual(ok.valid, true);
+  assert.strictEqual(ok.data?.amount_received, 499.5);
+  assert.strictEqual(ok.data?.payment_mode, 'online');
+
+  const missing = validatePassInput({ name: 'Julie Saxena' });
+  assert.strictEqual(missing.valid, false);
+  assert.ok(missing.errors.amount_received);
+  assert.ok(missing.errors.payment_mode);
+
+  const badMode = validatePassInput({ amount_received: 100, payment_mode: 'cheque' });
+  assert.strictEqual(badMode.valid, false);
+  assert.ok(badMode.errors.payment_mode);
+
+  const negative = validatePassInput({ amount_received: -10, payment_mode: 'cash' });
+  assert.strictEqual(negative.valid, false);
+  assert.ok(negative.errors.amount_received);
+
+  const notNumber = validatePassInput({ amount_received: 'abc', payment_mode: 'cash' });
+  assert.strictEqual(notNumber.valid, false);
+  assert.ok(notNumber.errors.amount_received);
 });
 
 test('normaliseName formats proper nouns cleanly', () => {

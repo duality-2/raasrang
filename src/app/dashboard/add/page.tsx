@@ -21,6 +21,10 @@ export default function AddAttendeePage() {
   const [ticketType, setTicketType] = useState<TicketType>('single');
   const [partySize, setPartySize] = useState<number | string>(1);
   
+  // Payment state
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'online'>('cash');
+  const [amountReceived, setAmountReceived] = useState('');
+
   // Phone input state for +91 prefix restriction
   const [phoneInput, setPhoneInput] = useState('');
 
@@ -277,6 +281,57 @@ export default function AddAttendeePage() {
               />
               {fieldErrors.email && <div className="form-error">{fieldErrors.email}</div>}
             </div>
+          </div>
+
+          {/* ── 5. Payment Details ── */}
+          <div className="form-group">
+            <label className="form-label">
+              Mode of Payment<span className="form-required">*</span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '6px' }}>
+              <button
+                type="button"
+                className={`btn ${paymentMode === 'cash' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setPaymentMode('cash')}
+                style={{ padding: '12px' }}
+                disabled={loading || success}
+              >
+                <strong>Cash</strong>
+              </button>
+              <button
+                type="button"
+                className={`btn ${paymentMode === 'online' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setPaymentMode('online')}
+                style={{ padding: '12px' }}
+                disabled={loading || success}
+              >
+                <strong>Online</strong>
+              </button>
+            </div>
+            <input type="hidden" name="payment_mode" value={paymentMode} />
+            {fieldErrors.payment_mode && <div className="form-error">{fieldErrors.payment_mode}</div>}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="amount_received" className="form-label">
+              Amount Received (₹)<span className="form-required">*</span>
+            </label>
+            <input
+              id="amount_received"
+              name="amount_received"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              className={`form-input ${fieldErrors.amount_received ? 'error' : ''}`}
+              value={amountReceived}
+              onChange={(e) => setAmountReceived(e.target.value)}
+              placeholder="Type amount, e.g. 500"
+              required
+              disabled={loading || success}
+              style={{ fontSize: '1.05rem', fontWeight: 600, padding: '10px 14px' }}
+            />
+            {fieldErrors.amount_received && <div className="form-error">{fieldErrors.amount_received}</div>}
           </div>
 
           <button

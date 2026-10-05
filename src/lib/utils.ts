@@ -111,6 +111,8 @@ export interface ValidationResult {
     seasonal_nights_count: number | null;
     valid_night_id: string | null;
     idempotency_key: string | null;
+    amount_received: number;
+    payment_mode: 'cash' | 'online';
   };
 }
 
@@ -129,6 +131,8 @@ export function validatePassInput(input: {
   seasonal_nights_count?: number | string;
   valid_night_id?: string;
   idempotency_key?: string;
+  amount_received?: number | string;
+  payment_mode?: string;
 }): ValidationResult {
   const errors: Record<string, string> = {};
 
@@ -240,6 +244,31 @@ export function validatePassInput(input: {
   // Idempotency key (optional)
   const idempotency_key = (input.idempotency_key ?? '').trim() || null;
 
+  // Payment mode (required): cash or online
+  const rawMode = (input.payment_mode ?? '').toString().trim().toLowerCase();
+  let payment_mode: 'cash' | 'online' = 'cash';
+  if (rawMode === 'cash' || rawMode === 'online') {
+    payment_mode = rawMode;
+  } else {
+    errors.payment_mode = 'Select a mode of payment (Cash or Online).';
+  }
+
+  // Amount received (required, typed manually, 0 allowed for complimentary)
+  let amount_received = 0;
+  const rawAmount = (input.amount_received ?? '').toString().trim();
+  if (rawAmount === '') {
+    errors.amount_received = 'Amount received is required.';
+  } else {
+    const parsed = Number(rawAmount);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      errors.amount_received = 'Enter a valid amount (0 or more).';
+    } else if (parsed > 10000000) {
+      errors.amount_received = 'Amount is too large.';
+    } else {
+      amount_received = Math.round(parsed * 100) / 100;
+    }
+  }
+
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };
   }
@@ -258,6 +287,8 @@ export function validatePassInput(input: {
       seasonal_nights_count,
       valid_night_id,
       idempotency_key,
+      amount_received,
+      payment_mode,
     },
   };
 }
