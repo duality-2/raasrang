@@ -24,9 +24,9 @@ export async function generateTicketPdf(
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
 
-  // Printable dimensions: 552.75 pt x 207.28 pt (aspect ratio 2.666:1)
+  // Printable dimensions: 552.75 pt x 178.82 pt (aspect ratio 3.09:1)
   const widthPt = 552.75;
-  const heightPt = 207.28;
+  const heightPt = 178.82;
   const page = pdfDoc.addPage([widthPt, heightPt]);
 
   // Load and embed background event artwork

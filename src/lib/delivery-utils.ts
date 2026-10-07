@@ -61,7 +61,8 @@ export function buildTicketMessage(pass: Pass, night?: EventNight | null): strin
   } else if (night) {
     const d = new Date(night.event_date + 'T00:00:00+05:30');
     const month = d.toLocaleDateString('en-IN', { month: 'long' });
-    dateLabel = `*Date:* ${ordinal(d.getDate())} ${month}`;
+    const weekday = d.toLocaleDateString('en-IN', { weekday: 'long' });
+    dateLabel = `*Date:* ${ordinal(d.getDate())} of ${month} ${weekday}`;
   } else {
     dateLabel = '*Date:* See ticket for details';
   }
@@ -72,7 +73,7 @@ export function buildTicketMessage(pass: Pass, night?: EventNight | null): strin
     `Please keep it safely saved on your phone and present the QR code at the entry.\n\n` +
     `${dateLabel}\n` +
     `*Time:* 6 PM onwards\n` +
-    `*Venue:* Mangeshi Banquet, Near Skydeck, Kalyan (West)\n\n` +
+    `*Venue:* Saxen Adream Lawns\n\n` +
     `Important:\n` +
     `• Please carry the ticket/QR code for entry.\n` +
     `• One ticket is valid for the number of persons mentioned at the time of booking.\n` +
