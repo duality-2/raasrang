@@ -28,47 +28,44 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
     ? `https://wa.me/${rawPhone}?text=${encodeURIComponent(shareText)}`
     : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
-  // Mobile Web Share API with PDF attachment
   const handleDeviceShare = async () => {
-    setShareFeedback('Preparing PDF for sharing...');
+    setShareFeedback('Preparing PDF...');
     try {
-      if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-        // Fetch PDF blob
-        const res = await fetch(`/api/passes/${pass.id}/pdf`);
-        const blob = await res.blob();
-        const file = new File([blob], `RaasRang-Ticket-${pass.manual_code}.pdf`, { type: 'application/pdf' });
+      const res = await fetch(`/api/passes/${pass.id}/pdf`);
+      const blob = await res.blob();
+      const file = new File([blob], `RaasRang-Ticket-${pass.manual_code}.pdf`, { type: 'application/pdf' });
 
-        const shareData = {
-          title: 'RAAS RANG 2026 — Official Ticket',
-        };
+      const shareData = {
+        title: 'RAAS RANG 2026 — Official Ticket',
+      };
 
-        if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-          await navigator.share({ ...shareData, files: [file] });
-          setShareFeedback('Shared via device sheet. Please tap "Mark as Sent" once sent.');
-          return;
-        }
+      if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        await navigator.share({ ...shareData, files: [file] });
+        setShareFeedback('Shared via device sheet. Please tap "Mark as Sent" once sent.');
+        return;
       }
-
-      // Fallback: If no native share, or canShare with file is not supported
-      // 1. Download PDF
-      const link = document.createElement('a');
-      link.href = `/api/passes/${pass.id}/pdf`;
-      link.download = `RaasRang-Ticket-${pass.manual_code}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // 2. Open MailTo
-      const subject = encodeURIComponent('RAAS RANG 2026 — Official Ticket');
-      const body = encodeURIComponent(shareText);
-      window.location.href = `mailto:?subject=${subject}&body=${body}`;
-
-      setShareFeedback('PDF downloaded. Please attach it manually to your email.');
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        setShareFeedback('Native share failed or was aborted.');
-      } else {
+      
+      // If canShare is false or missing, throw to trigger fallback
+      throw new Error('ShareNotSupported');
+    } catch (err: any) {
+      // If the user simply closed the share sheet, do not show an error
+      if (err.name === 'AbortError') {
         setShareFeedback(null);
+        return;
+      }
+      
+      // Fallback: If native share fails (e.g. async timeout in Safari, not supported, etc)
+      // Silently just download the PDF instead.
+      try {
+        const link = document.createElement('a');
+        link.href = `/api/passes/${pass.id}/pdf`;
+        link.download = `RaasRang-Ticket-${pass.manual_code}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setShareFeedback('PDF downloaded successfully.');
+      } catch (fallbackErr) {
+        setShareFeedback('Failed to download PDF.');
       }
     }
   };
