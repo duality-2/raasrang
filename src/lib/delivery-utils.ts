@@ -60,9 +60,12 @@ export function buildTicketMessage(pass: Pass, night?: EventNight | null): strin
     dateLabel = '*Dates:* All 9 Nights of Navratri (See ticket)';
   } else if (night) {
     const d = new Date(night.event_date + 'T00:00:00+05:30');
-    const month = d.toLocaleDateString('en-IN', { month: 'long' });
-    const weekday = d.toLocaleDateString('en-IN', { weekday: 'long' });
-    dateLabel = `*Date:* ${ordinal(d.getDate())} of ${month} ${weekday}`;
+    const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', weekday: 'long' });
+    const parts = formatter.formatToParts(d);
+    const day = parts.find(p => p.type === 'day')?.value || '1';
+    const month = parts.find(p => p.type === 'month')?.value || 'October';
+    const weekday = parts.find(p => p.type === 'weekday')?.value || 'Sunday';
+    dateLabel = `*Date:* ${ordinal(parseInt(day))} of ${month} ${weekday}`;
   } else {
     dateLabel = '*Date:* See ticket for details';
   }
@@ -73,7 +76,7 @@ export function buildTicketMessage(pass: Pass, night?: EventNight | null): strin
     `Please keep it safely saved on your phone and present the QR code at the entry.\n\n` +
     `${dateLabel}\n` +
     `*Time:* 6 PM onwards\n` +
-    `*Venue:* Saxen Adream Lawns\n\n` +
+    `*Venue:* Saxena Dream Lawns gandhari kalyan W\n\n` +
     `Important:\n` +
     `• Please carry the ticket/QR code for entry.\n` +
     `• One ticket is valid for the number of persons mentioned at the time of booking.\n` +
