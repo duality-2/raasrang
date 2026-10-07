@@ -11,6 +11,7 @@ export interface DayCandle {
   isActive: boolean;
   peopleCount: number; // SUM(party_size) over SINGLE passes whose valid_night_id is that day
   passCount: number;
+  collection: number; // SUM(amount_received) for this day
 }
 
 export type DayAttendanceMetrics = DayCandle;
@@ -18,11 +19,13 @@ export type DayAttendanceMetrics = DayCandle;
 export interface SeasonalCandle {
   peopleCount: number; // SUM(party_size) over ALL seasonal passes
   passCount: number;
+  collection: number;
 }
 
 export interface UnassignedCandle {
   peopleCount: number; // SUM(party_size) over single passes with valid_night_id IS NULL
   passCount: number;
+  collection: number;
 }
 
 interface RpcDayItem {
@@ -41,6 +44,7 @@ export interface OverallAttendanceMetrics {
   unassigned: UnassignedCandle;
   totalPasses: number; // Count of all non-cancelled passes (119)
   totalPeople: number; // Sum of party_size across all non-cancelled passes (218)
+  totalCollection: number; // Sum of amount_received
   peakDayTitle: string;
   peakDayPeople: number;
   totalFootfallCapacity: number; // 9-day footfall capacity: single passes + 9 * seasonal
@@ -62,62 +66,17 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
 
   const admin = createAdminClient();
 
-  // 1. Attempt database-level aggregation via RPC (from migration 006)
+  // 1. Database-level aggregation via RPC (from migration 006)
+  // Temporarily disabled to allow computation of amount_received without updating SQL.
+  /*
   try {
     const { data: rpcData, error: rpcError } = await admin.rpc(
       'get_attendance_chart_metrics'
     );
-
-    if (!rpcError && rpcData && Array.isArray(rpcData.days)) {
-      const days: DayCandle[] = (rpcData.days as RpcDayItem[]).map((d) => ({
-        nightId: d.night_id,
-        nightNumber: d.night_number,
-        title: d.title,
-        eventDate: d.event_date,
-        isActive: Boolean(d.is_active),
-        peopleCount: Number(d.people_count) || 0,
-        passCount: Number(d.pass_count) || 0,
-      }));
-
-      const seasonal: SeasonalCandle = {
-        peopleCount: Number(rpcData.seasonal?.people_count) || 0,
-        passCount: Number(rpcData.seasonal?.pass_count) || 0,
-      };
-
-      const unassigned: UnassignedCandle = {
-        peopleCount: Number(rpcData.unassigned?.people_count) || 0,
-        passCount: Number(rpcData.unassigned?.pass_count) || 0,
-      };
-
-      let peakDayPeople = 0;
-      let peakDayTitle = 'None';
-      days.forEach((d) => {
-        if (d.peopleCount > peakDayPeople) {
-          peakDayPeople = d.peopleCount;
-          peakDayTitle = d.title;
-        }
-      });
-
-      const singleDaysTotal = days.reduce((sum, d) => sum + d.peopleCount, 0);
-      const totalFootfallCapacity = singleDaysTotal + seasonal.peopleCount * 9;
-
-      return {
-        days,
-        seasonal,
-        unassigned,
-        totalPasses: Number(rpcData.total_passes) || 0,
-        totalPeople: Number(rpcData.total_people) || 0,
-        peakDayTitle,
-        peakDayPeople,
-        totalFootfallCapacity,
-        lastUpdated: new Date().toISOString(),
-        syncSource: 'database_rpc',
-      };
-    }
+    // ...
   } catch {
-    // If RPC does not exist (migration 006 unapplied on production Supabase),
-    // proceed to graceful server-side DB aggregation below.
   }
+  */
 
   // 2. Server-side Database Aggregation Fallback
   // Fetch event nights configuration (ordered by night_number)
@@ -134,7 +93,7 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
   // Fetch only non-cancelled passes with minimal necessary fields
   const { data: passesData, error: passesError } = await admin
     .from('passes')
-    .select('id, ticket_type, party_size, valid_night_id, status')
+    .select('id, ticket_type, party_size, valid_night_id, status, amount_received')
     .neq('status', 'cancelled');
 
   if (passesError || !passesData) {
@@ -165,6 +124,11 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
       peakDayTitle = night.title;
     }
 
+    const collection = nightSingles.reduce(
+      (sum, p) => sum + (Number(p.amount_received) || 0),
+      0
+    );
+
     return {
       nightId: night.id,
       nightNumber: night.night_number,
@@ -173,6 +137,7 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
       isActive: Boolean(night.is_active),
       peopleCount,
       passCount,
+      collection,
     };
   });
 
@@ -181,19 +146,29 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
     (sum, p) => sum + (p.party_size || 1),
     0
   );
+  const seasonalCollection = seasonalPasses.reduce(
+    (sum, p) => sum + (Number(p.amount_received) || 0),
+    0
+  );
   const seasonal: SeasonalCandle = {
     peopleCount: seasonalPeople,
     passCount: seasonalPasses.length,
+    collection: seasonalCollection,
   };
 
   // Compute Unassigned Candle: SINGLE passes without valid_night_id
   const unassignedSingles = singlePasses.filter((p) => !p.valid_night_id);
+  const unassignedCollection = unassignedSingles.reduce(
+    (sum, p) => sum + (Number(p.amount_received) || 0),
+    0
+  );
   const unassigned: UnassignedCandle = {
     peopleCount: unassignedSingles.reduce(
       (sum, p) => sum + (p.party_size || 1),
       0
     ),
     passCount: unassignedSingles.length,
+    collection: unassignedCollection,
   };
 
   const totalPasses = passesData.length;
@@ -203,12 +178,18 @@ export async function getAttendanceMetrics(): Promise<OverallAttendanceMetrics |
   );
   const totalFootfallCapacity = totalSingleDayPeople + seasonalPeople * 9;
 
+  const totalCollection = passesData.reduce(
+    (sum, p) => sum + (Number(p.amount_received) || 0),
+    0
+  );
+
   return {
     days,
     seasonal,
     unassigned,
     totalPasses,
     totalPeople,
+    totalCollection,
     peakDayTitle,
     peakDayPeople,
     totalFootfallCapacity,

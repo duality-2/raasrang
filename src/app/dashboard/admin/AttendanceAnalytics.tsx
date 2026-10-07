@@ -180,8 +180,13 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
     peakDayTitle,
     peakDayPeople,
     totalFootfallCapacity,
+    totalCollection,
     syncSource,
   } = data;
+
+  const formatCurrency = (num: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+  };
 
   // Max value across all 10 candles (9 days + 1 seasonal) for visual chart scaling
   const maxCandlePeople = Math.max(
@@ -299,6 +304,20 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
           </div>
           <div className="kpi-subtext">
             Combined sum across all 9 festival evenings ({totalPeople} total people entitled)
+          </div>
+        </div>
+
+        {/* Metric 5: Total Collection */}
+        <div className="kpi-card highlight-blue">
+          <div className="kpi-header">
+            <span className="kpi-icon">💰</span>
+            <span className="kpi-label">Total Collection</span>
+          </div>
+          <div className="kpi-value-row">
+            <span className="kpi-value">{formatCurrency(totalCollection)}</span>
+          </div>
+          <div className="kpi-subtext">
+            Total amount received from all passes (online + cash)
           </div>
         </div>
       </div>
@@ -561,6 +580,119 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
             </button>
           </div>
         )}
+      </div>
+
+      {/* ── Interactive Visual Chart: Day-Wise Collection ── */}
+      <div className="analytics-chart-card" style={{ marginTop: '24px' }}>
+        <div className="chart-header">
+          <div>
+            <h3 className="chart-title">
+              💰 Revenue Collection (Single Days + Season Pass)
+            </h3>
+            <p className="chart-subtitle">
+              Total amount received per day and for seasonal passes.
+            </p>
+          </div>
+        </div>
+
+        {/* SVG Interactive Chart for Collections */}
+        <div className="svg-chart-wrapper">
+          <svg className="attendance-svg-chart" viewBox="0 0 1020 250" preserveAspectRatio="none">
+            {/* Horizontal guide lines */}
+            <line x1="30" y1="35" x2="1000" y2="35" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="90" x2="1000" y2="90" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="145" x2="1000" y2="145" stroke="#f1f5f9" strokeDasharray="4 4" />
+            <line x1="30" y1="200" x2="1000" y2="200" stroke="#e2e8f0" strokeWidth="1.5" />
+
+            {/* Subtle Divider between 9 Days and Seasonal Candle */}
+            <line x1="865" y1="20" x2="865" y2="235" stroke="#e2e8f0" strokeDasharray="3 3" strokeWidth="1.5" />
+
+            {(() => {
+              const maxCollection = Math.max(
+                1,
+                ...days.map((d) => d.collection || 0),
+                seasonal.collection || 0
+              );
+
+              return (
+                <>
+                  {days.map((night, idx) => {
+                    const candleWidth = 58;
+                    const spacing = 90;
+                    const x = 40 + idx * spacing;
+                    const chartHeight = 155;
+                    const yBase = 200;
+
+                    const val = night.collection || 0;
+                    const ratio = val / maxCollection;
+                    const candleHeight = val > 0 ? Math.max(12, ratio * chartHeight) : 4;
+                    const yTop = yBase - candleHeight;
+                    const isToday = night.isActive;
+
+                    return (
+                      <g key={'col_' + night.nightId} className="chart-bar-group">
+                        <rect
+                          x={x}
+                          y={yTop}
+                          width={candleWidth}
+                          height={candleHeight}
+                          rx="5"
+                          fill="#3b82f6"
+                        />
+                        <text
+                          x={x + candleWidth / 2}
+                          y={yTop - 8}
+                          textAnchor="middle"
+                          fontSize="11"
+                          fontWeight="800"
+                          fill="#1e3a8a"
+                        >
+                          {val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}
+                        </text>
+                        <text
+                          x={x + candleWidth / 2}
+                          y="218"
+                          textAnchor="middle"
+                          fontSize="12"
+                          fontWeight={isToday ? '800' : '600'}
+                          fill={isToday ? '#047857' : '#334155'}
+                        >
+                          {night.title}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Seasonal Collection Candle */}
+                  <g key="col_seasonal" className="chart-bar-group">
+                    {(() => {
+                      const candleWidth = 62;
+                      const x = 890;
+                      const chartHeight = 155;
+                      const yBase = 200;
+                      const val = seasonal.collection || 0;
+                      const ratio = val / maxCollection;
+                      const candleHeight = val > 0 ? Math.max(12, ratio * chartHeight) : 4;
+                      const yTop = yBase - candleHeight;
+
+                      return (
+                        <>
+                          <rect x={x} y={yTop} width={candleWidth} height={candleHeight} rx="5" fill="#f59e0b" />
+                          <text x={x + candleWidth / 2} y={yTop - 8} textAnchor="middle" fontSize="11" fontWeight="800" fill="#b45309">
+                            {val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val}
+                          </text>
+                          <text x={x + candleWidth / 2} y="218" textAnchor="middle" fontSize="12" fontWeight="800" fill="#b45309">
+                            Seasonal
+                          </text>
+                        </>
+                      );
+                    })()}
+                  </g>
+                </>
+              );
+            })()}
+          </svg>
+        </div>
       </div>
 
       {/* ── Day-by-Day Cards Breakdown Grid ── */}
