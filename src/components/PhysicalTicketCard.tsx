@@ -33,7 +33,7 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, ni
         position: 'relative',
         width: '100%',
         maxWidth: '860px',
-        aspectRatio: '3200 / 1200',
+        aspectRatio: '3200 / 1035',
         backgroundImage: 'url(/ticket-bg.png)',
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',

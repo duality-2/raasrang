@@ -12,11 +12,11 @@ export const TICKET_LAYOUT_CONFIG = {
   /** Ticket aspect ratio and dimensions */
   ticket: {
     pixelWidth: 3200,
-    pixelHeight: 1200,
-    aspectRatio: '3200 / 1200',
+    pixelHeight: 1035,
+    aspectRatio: '3200 / 1035',
     /** Printable physical dimensions on A4 (fits 3 tickets per sheet comfortably) */
     printWidthMm: 195,
-    printHeightMm: 73.125, // (195 / 2.666)
+    printHeightMm: 63.1, // (195 / 3.09)
   },
 
   /**
@@ -25,13 +25,13 @@ export const TICKET_LAYOUT_CONFIG = {
    */
   qr: {
     /** Left coordinate as % of ticket width */
-    leftPercent: 83.5,
+    leftPercent: 82.82,
     /** Top coordinate as % of ticket height */
-    topPercent: 55.0,
+    topPercent: 55.39,
     /** Width as % of ticket width */
-    widthPercent: 12.0,
+    widthPercent: 11.84,
     /** Height as % of ticket height */
-    heightPercent: 32.0,
+    heightPercent: 36.73,
     /** Error correction level: Q (25% recovery) */
     errorCorrectionLevel: 'Q' as const,
   },
