@@ -38,33 +38,39 @@ export default function PresenceTracker({
     admin: 0,
   });
   
-  const supabase = createClient();
-
+  // Generate a stable unique key for each distinct device / tab session
+  const [sessionKey] = useState(() => `${userId}_${Math.random().toString(36).substring(2, 9)}`);
+  
   useEffect(() => {
     if (!userId || !role) return;
 
-    // Track the user in the online-users channel
+    const supabase = createClient();
+
+    // Track each device/session uniquely in the online-users channel
     const channel = supabase.channel('online-users', {
       config: {
         presence: {
-          key: userId,
+          key: sessionKey,
         },
       },
     });
 
-    channel.on('presence', { event: 'sync' }, () => {
+    const updateCounts = () => {
       const newState = channel.presenceState();
       
       let orgs = 0, scans = 0, ticks = 0, admins = 0;
 
+      // Iterate through all connected device sessions
       for (const presenceId in newState) {
         const presences = newState[presenceId];
         if (presences && presences.length > 0) {
-          const state = presences[0] as unknown as { role: UserRole };
-          if (state.role === 'organiser') orgs++;
-          if (state.role === 'scanner') scans++;
-          if (state.role === 'ticketer') ticks++;
-          if (state.role === 'admin') admins++;
+          for (const item of presences) {
+            const state = item as unknown as { role: UserRole };
+            if (state.role === 'organiser') orgs++;
+            if (state.role === 'scanner') scans++;
+            if (state.role === 'ticketer') ticks++;
+            if (state.role === 'admin') admins++;
+          }
         }
       }
 
@@ -74,22 +80,29 @@ export default function PresenceTracker({
         ticketer: ticks,
         admin: admins,
       });
-    });
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, updateCounts)
+      .on('presence', { event: 'join' }, updateCounts)
+      .on('presence', { event: 'leave' }, updateCounts);
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({
           user_id: userId,
           role: role,
+          device_id: sessionKey,
           online_at: new Date().toISOString(),
         });
       }
     });
 
     return () => {
+      channel.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [userId, role, supabase]);
+  }, [userId, role, sessionKey]);
 
   return (
     <PresenceContext.Provider value={activeCounts}>
