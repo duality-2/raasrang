@@ -28,15 +28,6 @@ export interface UnassignedCandle {
   collection: number;
 }
 
-interface RpcDayItem {
-  night_id: string;
-  night_number: number;
-  title: string;
-  event_date: string;
-  is_active: boolean;
-  people_count: number;
-  pass_count: number;
-}
 
 export interface OverallAttendanceMetrics {
   days: DayCandle[];

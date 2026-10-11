@@ -25,13 +25,13 @@ export const TICKET_LAYOUT_CONFIG = {
    */
   qr: {
     /** Left coordinate as % of ticket width */
-    leftPercent: 82.82,
+    leftPercent: 82.84,
     /** Top coordinate as % of ticket height */
-    topPercent: 55.39,
+    topPercent: 47.34,
     /** Width as % of ticket width */
-    widthPercent: 11.84,
+    widthPercent: 11.81,
     /** Height as % of ticket height */
-    heightPercent: 36.73,
+    heightPercent: 36.62,
     /** Error correction level: Q (25% recovery) */
     errorCorrectionLevel: 'Q' as const,
   },

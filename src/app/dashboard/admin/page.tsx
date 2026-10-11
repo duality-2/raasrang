@@ -3,6 +3,7 @@ import { getEventNights } from '@/actions/event-nights';
 import { getAttendanceMetrics } from '@/actions/attendance-metrics';
 import EventNightControls from './EventNightControls';
 import AttendanceAnalytics from './AttendanceAnalytics';
+import ActiveLoginsWidget from './ActiveLoginsWidget';
 import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -30,17 +31,23 @@ export default async function AdminPage() {
         </p>
       </header>
 
+
       {/* ── Real-Time Attendance Analytics & Capacity Visuals (Admin Profile Only) ── */}
       <section style={{ marginBottom: '36px' }}>
         <AttendanceAnalytics initialData={metrics} />
       </section>
 
       {/* ── Event Nights & Day Activation Controls ── */}
-      <section className="card">
+      <section className="card" style={{ marginBottom: '36px' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 20px 0', borderBottom: '1px solid #eee', paddingBottom: '12px' }}>
           🌟 Event Nights & Gate Day Activation
         </h2>
         <EventNightControls nights={nights} />
+      </section>
+
+      {/* ── Real-Time Active Logins (Moved to bottom) ── */}
+      <section>
+        <ActiveLoginsWidget />
       </section>
     </div>
   );

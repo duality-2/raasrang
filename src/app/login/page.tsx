@@ -25,7 +25,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
+    <>
+      <div className="login-page">
       <div className="login-card card">
         <div className="login-brand">
           <h1>RAAS RANG</h1>
@@ -89,5 +90,6 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+    </>
   );
 }

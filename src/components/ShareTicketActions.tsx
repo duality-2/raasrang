@@ -47,9 +47,9 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
       
       // If canShare is false or missing, throw to trigger fallback
       throw new Error('ShareNotSupported');
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If the user simply closed the share sheet, do not show an error
-      if (err.name === 'AbortError') {
+      if (err instanceof Error && err.name === 'AbortError') {
         setShareFeedback(null);
         return;
       }
@@ -64,7 +64,7 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
         link.click();
         document.body.removeChild(link);
         setShareFeedback('PDF downloaded successfully.');
-      } catch (fallbackErr) {
+      } catch {
         setShareFeedback('Failed to download PDF.');
       }
     }

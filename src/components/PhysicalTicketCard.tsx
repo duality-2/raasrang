@@ -34,7 +34,7 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, ni
         width: '100%',
         maxWidth: '860px',
         aspectRatio: '3200 / 1035',
-        backgroundImage: 'url(/ticket-bg.png)',
+        backgroundImage: 'url(/ticket-bg.png?v=20261011)',
         backgroundSize: '100% 100%',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -46,10 +46,10 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, ni
         userSelect: 'none',
       }}
     >
-      {/* ── Background Artwork (Natural 1024x382 image with full Durga artwork, elephants, venue & right stub) ── */}
+      {/* ── Background Artwork ── */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/ticket-bg.png"
+        src="/ticket-bg.png?v=20261011"
         alt="RAAS RANG 2026 Ticket"
         style={{
           position: 'absolute',
@@ -163,55 +163,22 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, ni
         </span>
       </div>
 
-      {/* ── Night / Day Override Overlay ── */}
-      <div
-        className="ticket-day-overlay"
-        style={{
-          position: 'absolute',
-          left: '60.5%', // Shifted a few pixels left
-          top: '48.0%',  // Shifted perfectly between logo and text
-          width: '16%',
-          height: '10%',
-          background: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10,
-        }}
-      >
-        <span
-          style={{
-            color: '#ffffff', // White ink
-            backgroundColor: '#000000', // Solid black background to cover baked-in text
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontWeight: 900,
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            fontSize: 'clamp(15px, 2.2vw, 28px)',
-            letterSpacing: '0.08em',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {pass.ticket_type === 'seasonal'
-            ? 'ALL DAYS'
-            : (night?.title || 'DAY 1').toUpperCase()}
-        </span>
-      </div>
-
-      {/* ── Ticket Entitlement & Attendee Overlay ── */}
+      {/* ── Ticket Entitlement & Attendee Overlay (Clean placement in open area between left sponsors and Durga logo) ── */}
       <div
         className="ticket-entitlement-overlay"
         style={{
           position: 'absolute',
-          bottom: '22%',
-          left: '1.5%', // Shifted further to the left
-          width: '35%',
-          height: '15%',
+          left: '16.5%',
+          top: '36%',
+          width: '13.5%',
+          height: '28%',
           background: 'transparent',
           zIndex: 10,
           display: 'flex',
           flexDirection: 'column',
+          alignItems: 'center',
           justifyContent: 'center',
+          textAlign: 'center',
           gap: '4px',
           pointerEvents: 'none',
         }}
@@ -220,42 +187,51 @@ export default function PhysicalTicketCard({ pass, ticketNumber, isTestBatch, ni
           <span
             style={{
               fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: 'clamp(14px, 1.8vw, 22px)', // Increased font size significantly
+              fontSize: 'clamp(11px, 1.25vw, 17px)',
               fontWeight: 900,
-              color: '#000000',
-              letterSpacing: '0.05em',
+              color: '#ffffff',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.6)',
+              lineHeight: 1.15,
+              wordBreak: 'break-word',
             }}
           >
-            ATTENDEE: {pass.name.toUpperCase()}
+            {pass.name}
           </span>
         )}
-        <div
+        <span
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
             fontFamily: 'system-ui, -apple-system, sans-serif',
-            fontSize: 'clamp(12px, 1.5vw, 18px)', // Increased font size significantly
-            fontWeight: 900,
-            color: '#000000',
-            letterSpacing: '0.05em',
+            fontSize: 'clamp(9.5px, 1.1vw, 14.5px)',
+            fontWeight: 800,
+            color: '#fef08a',
+            letterSpacing: '0.06em',
             textTransform: 'uppercase',
+            textShadow: '0 1px 3px rgba(0, 0, 0, 0.7)',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
           }}
         >
-          <span>{pass.ticket_type === 'seasonal' ? 'SEASONAL PASS' : 'SINGLE TICKET'}</span>
-          <span>•</span>
-          <span>ADMIT {pass.party_size || 1}</span>
-          {pass.ticket_type === 'seasonal' && (
-            <>
-              <span>•</span>
-              <span>
-                {pass.seasonal_nights_count
-                  ? `${pass.seasonal_nights_count} NIGHTS`
-                  : '9 NIGHTS'}
-              </span>
-            </>
-          )}
-        </div>
+          {pass.ticket_type === 'seasonal'
+            ? 'ALL DAYS'
+            : (night?.title || 'DAY 1').toUpperCase()}
+        </span>
+        <span
+          style={{
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: 'clamp(9px, 1.0vw, 13.5px)',
+            fontWeight: 800,
+            color: '#fbbf24',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            textShadow: '0 1px 3px rgba(0, 0, 0, 0.7)',
+            lineHeight: 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ADMIT - {pass.party_size || 1}
+        </span>
       </div>
 
       {/* ── Sequence Number (Optional in bottom-left) ── */}

@@ -754,11 +754,16 @@ h1, h2, h3, h4 {
 .header-nav-links {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
   margin-left: 24px;
 }
 
 .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
   font-size: 0.88rem;
   font-weight: 500;
   color: var(--muted);
@@ -2813,3 +2818,148 @@ h1, h2, h3, h4 {
   font-size: 1.2rem;
 }
 
+
+/* ==========================================================
+   Login Intro Animation
+   ========================================================== */
+.intro-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.intro-overlay.fade-out {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.05);
+}
+
+.intro-graphic {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 2rem;
+  will-change: transform;
+}
+
+.stick-left {
+  /* Added a highly dynamic spring-like bezier for the clash impact */
+  animation: stickClashLeft 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.stick-right {
+  animation: stickClashRight 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.clash-sparks {
+  animation: sparksPop 1s ease-out forwards;
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.aura-anim {
+  animation: auraPulse 1s ease-out forwards;
+  opacity: 0;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+@keyframes stickClashLeft {
+  0% { transform: translate(-50px, -50px) rotate(-40deg); opacity: 0; }
+  40% { transform: translate(5px, 5px) rotate(45deg); opacity: 1; }
+  100% { transform: translate(0px, 0px) rotate(35deg); opacity: 1; }
+}
+
+@keyframes stickClashRight {
+  0% { transform: translate(50px, -50px) rotate(40deg); opacity: 0; }
+  40% { transform: translate(-5px, 5px) rotate(-45deg); opacity: 1; }
+  100% { transform: translate(0px, 0px) rotate(-35deg); opacity: 1; }
+}
+
+@keyframes sparksPop {
+  0% { transform: scale(0) rotate(0deg); opacity: 0; }
+  40% { transform: scale(2) rotate(45deg); opacity: 1; }
+  100% { transform: scale(0.8) rotate(90deg); opacity: 0; }
+}
+
+@keyframes auraPulse {
+  0% { opacity: 0; transform: scale(0.5); }
+  40% { opacity: 0.9; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+.intro-text-1 {
+  font-family: "Outfit", sans-serif;
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: var(--primary-d, #3b0764);
+  letter-spacing: -0.02em;
+  animation: slideUpMask 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+  opacity: 0;
+  transform: translateY(20px);
+  will-change: transform, opacity;
+}
+
+.intro-text-2 {
+  font-family: "Inter", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--gold, #F59E0B);
+  text-transform: uppercase;
+  margin-top: 8px;
+  animation: slideUpMask 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+  opacity: 0;
+  transform: translateY(20px);
+  letter-spacing: 0.25em;
+  will-change: transform, opacity;
+}
+
+@keyframes slideUpMask {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.login-page {
+  opacity: 0;
+}
+
+.login-page.show {
+  animation: slideUpFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes slideUpFade {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes subtleZoom {
+  0% { transform: scale(0.95); opacity: 0; filter: blur(10px); }
+  100% { transform: scale(1); opacity: 1; filter: blur(0px); }
+}
+@keyframes letterSpace {
+  0% { letter-spacing: 0.1em; opacity: 0; }
+  100% { letter-spacing: 0.25em; opacity: 1; }
+}
+
+/* ==========================================================
+   Global Button Interaction Upgrades
+   ========================================================== */
+.btn {
+  transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, opacity 0.2s ease;
+  will-change: transform;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
+}

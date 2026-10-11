@@ -101,66 +101,44 @@ export async function generateTicketPdf(
     color: rgb(0.07, 0.09, 0.15),
   });
 
-  // Ticket entitlement overlays
-  const isSeasonal = pass.ticket_type === 'seasonal';
-  const typeText = isSeasonal ? 'SEASONAL PASS' : 'SINGLE TICKET';
-  const partySizeText = `ADMIT ${pass.party_size || 1}`;
-  const nightsText = isSeasonal
-    ? pass.seasonal_nights_count
-      ? `${pass.seasonal_nights_count} NIGHTS`
-      : '9 NIGHTS'
-    : '';
-
-  const badgeText = [typeText, partySizeText, nightsText].filter(Boolean).join(' • ');
-  const badgeX = widthPt * 0.025; // Shifted further to the left
-  const badgeY = heightPt * 0.12;
-
-  // Cover background removed - transparent for clean layout
+  // Ticket entitlement & attendee overlays (Clean placement in open area between left sponsors and Durga logo)
+  const slotCenterX = widthPt * 0.232; // Center of open slot (between sponsors and Durga)
   
   if (pass.name) {
-    const attendeeText = `ATTENDEE: ${pass.name.toUpperCase()}`;
+    const attendeeText = pass.name.toUpperCase();
+    const nameFontSize = 11.5; // ~10% smaller than 13
+    const nameWidth = fontHelveticaBold.widthOfTextAtSize(attendeeText, nameFontSize);
     page.drawText(attendeeText, {
-      x: badgeX,
-      y: badgeY + 16,
-      size: 13, // Increased font size
+      x: slotCenterX - (nameWidth / 2),
+      y: heightPt * 0.54,
+      size: nameFontSize,
       font: fontHelveticaBold,
-      color: rgb(0, 0, 0), // Solid black
+      color: rgb(1, 1, 1), // Crisp white text
     });
   }
 
-  page.drawText(badgeText, {
-    x: badgeX,
-    y: badgeY,
-    size: 11, // Increased font size
-    font: fontHelveticaBold,
-    color: rgb(0, 0, 0), // Solid black
-  });
-
-  // Day Override Badge (Covers DAY - 1 baked-in text)
   const dayText = pass.ticket_type === 'seasonal'
     ? 'ALL DAYS'
     : (night?.title || 'DAY 1').toUpperCase();
-    
-  const dayTextWidth = fontHelveticaBold.widthOfTextAtSize(dayText, 18);
-  const dayBadgeX = widthPt * 0.605 - (dayTextWidth / 2); // Shifted slightly left under Nexora logo
-  const dayBadgeY = heightPt * 0.45; // Perfectly positioned above text
-
-  // Draw solid black rectangle to cover baked-in "DAY - 1" text
-  page.drawRectangle({
-    x: widthPt * 0.605 - 40, // Centered around the text area
-    y: dayBadgeY - 5,
-    width: 80,
-    height: 25,
-    color: rgb(0, 0, 0), // Solid black background
+  const dayFontSize = 9.8;
+  const dayWidth = fontHelveticaBold.widthOfTextAtSize(dayText, dayFontSize);
+  page.drawText(dayText, {
+    x: slotCenterX - (dayWidth / 2),
+    y: heightPt * 0.44,
+    size: dayFontSize,
+    font: fontHelveticaBold,
+    color: rgb(1.0, 0.94, 0.54), // Soft festival gold
   });
 
-  // Text inside Day badge (White for contrast against black box)
-  page.drawText(dayText, {
-    x: dayBadgeX,
-    y: dayBadgeY,
-    size: 18,
+  const admitText = `ADMIT - ${pass.party_size || 1}`;
+  const admitFontSize = 9.4; // ~10% smaller than 10.5
+  const admitWidth = fontHelveticaBold.widthOfTextAtSize(admitText, admitFontSize);
+  page.drawText(admitText, {
+    x: slotCenterX - (admitWidth / 2),
+    y: heightPt * 0.35,
+    size: admitFontSize,
     font: fontHelveticaBold,
-    color: rgb(1, 1, 1), // White text
+    color: rgb(0.98, 0.78, 0.22), // Warm festival gold
   });
 
   // TEST Watermark (only for test passes)
