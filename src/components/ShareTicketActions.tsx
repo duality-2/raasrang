@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Pass } from '@/types';
 import { recordManualShareAction } from '@/actions/delivery';
 
@@ -10,6 +11,7 @@ interface ShareTicketActionsProps {
 }
 
 export default function ShareTicketActions({ pass, shareText }: ShareTicketActionsProps) {
+  const router = useRouter();
   const [deliveryStatus, setDeliveryStatus] = useState<string>(
     pass.delivery_status === 'not_sent' ? 'ready_to_share' : pass.delivery_status || 'ready_to_share'
   );
@@ -160,7 +162,10 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
       const res = await recordManualShareAction(pass.id);
       if (res.success) {
         setDeliveryStatus('manually_shared');
-        setShareFeedback('✓ Confirmed sent by ticketer.');
+        setShareFeedback('✓ Confirmed sent! Resetting form for next attendee…');
+        setTimeout(() => {
+          router.push('/dashboard/add');
+        }, 600);
       } else {
         setShareFeedback('Failed to record delivery status.');
       }
@@ -254,9 +259,9 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
         </span>
       </div>
 
-      {/* Human Explicit Confirmation Button */}
-      {!isAlreadySent && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Human Explicit Confirmation Button / Next Attendee */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {!isAlreadySent ? (
           <button
             type="button"
             onClick={handleConfirmSent}
@@ -270,10 +275,28 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
               fontWeight: 600,
             }}
           >
-            {isConfirming ? 'Recording…' : 'Mark as Sent'}
+            {isConfirming ? 'Recording…' : 'Mark as Sent & Next Attendee'}
           </button>
-        </div>
-      )}
+        ) : (
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/add')}
+            className="btn btn-primary btn-sm"
+            style={{
+              background: '#15803d',
+              borderColor: '#166534',
+              color: '#ffffff',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span>+ Issue Next Attendee</span>
+          </button>
+        )}
+      </div>
 
       {shareFeedback && (
         <div style={{ fontSize: '0.82rem', color: '#047857', fontWeight: 600 }}>

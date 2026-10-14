@@ -7,6 +7,7 @@ import { createPass } from '@/actions/passes';
 import { getEventNights, type EventNight } from '@/actions/event-nights';
 import type { TicketType, Pass } from '@/types';
 import { buildTicketMessage, buildWhatsAppUrl } from '@/lib/delivery-utils';
+import { recordManualShareAction } from '@/actions/delivery';
 
 export default function AddAttendeePage() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AddAttendeePage() {
   const [nameInput, setNameInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [lastIssuedPass, setLastIssuedPass] = useState<{ passId: string; name: string } | null>(null);
+  const [markedSentPassId, setMarkedSentPassId] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Ticket configuration state
@@ -62,6 +64,26 @@ export default function AddAttendeePage() {
     }
     return 'pass_gen_' + Math.random().toString(36).substring(2);
   });
+
+  const resetForm = () => {
+    setNameInput('');
+    setPhoneInput('');
+    setEmailInput('');
+    setAmountReceived('');
+    setPartySize(1);
+    setTicketType('single');
+    setError(null);
+    setFieldErrors({});
+    setIdempotencyKey('pass_gen_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)));
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 50);
+  };
+
+  useEffect(() => {
+    // Auto-focus attendee name input on page load or navigation
+    nameInputRef.current?.focus();
+  }, []);
 
   async function handleSubmit(formData: FormData) {
     const isStayMode = submitModeRef.current === 'whatsapp_stay';
@@ -152,16 +174,8 @@ export default function AddAttendeePage() {
             }
 
             setLastIssuedPass({ passId: result.passId, name: nameInput.trim() || 'Attendee' });
-            setNameInput('');
-            setPhoneInput('');
-            setEmailInput('');
-            setAmountReceived('');
-            setPartySize(1);
-            setIdempotencyKey('pass_gen_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)));
-
-            setTimeout(() => {
-              nameInputRef.current?.focus();
-            }, 100);
+            setMarkedSentPassId(null);
+            resetForm();
             return;
           }
 
@@ -223,14 +237,42 @@ export default function AddAttendeePage() {
                 WhatsApp opened & PDF downloaded. Form is ready for next attendee.
               </div>
             </div>
-            <Link
-              href={`/dashboard/passes/${lastIssuedPass.passId}`}
-              target="_blank"
-              className="btn btn-secondary btn-sm"
-              style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', fontWeight: 600 }}
-            >
-              View Ticket ↗
-            </Link>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {markedSentPassId !== lastIssuedPass.passId ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await recordManualShareAction(lastIssuedPass.passId);
+                    setMarkedSentPassId(lastIssuedPass.passId);
+                    resetForm();
+                  }}
+                  className="btn btn-primary btn-sm"
+                  style={{
+                    fontSize: '0.8rem',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 600,
+                    background: '#047857',
+                    borderColor: '#047857',
+                    color: '#ffffff',
+                    padding: '4px 10px',
+                  }}
+                >
+                  Mark as Sent
+                </button>
+              ) : (
+                <span style={{ fontSize: '0.8rem', color: '#047857', fontWeight: 700 }}>
+                  ✓ Sent & Inputs Reset
+                </span>
+              )}
+              <Link
+                href={`/dashboard/passes/${lastIssuedPass.passId}`}
+                target="_blank"
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', fontWeight: 600, padding: '4px 10px' }}
+              >
+                View Ticket ↗
+              </Link>
+            </div>
           </div>
         )}
 
