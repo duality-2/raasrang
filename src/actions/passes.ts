@@ -139,19 +139,17 @@ export async function createPass(formData: FormData) {
         }
       }
 
-      // Track ticket delivery state record
-      try {
-        await admin.from('ticket_deliveries').insert({
+      // Track ticket delivery state record non-blocking (saves ~50ms network latency)
+      void Promise.resolve(
+        admin.from('ticket_deliveries').insert({
           pass_id: data.id,
           idempotency_key: `delivery_${data.id}`,
           channel: 'whatsapp_manual',
           destination_phone: validatedData.phone,
           delivery_status: 'ready_to_share',
           created_by: user.id,
-        });
-      } catch {
-        // Table may be pending migration 004
-      }
+        })
+      ).catch(() => {});
 
       revalidatePath('/dashboard');
       revalidatePath('/dashboard/passes');

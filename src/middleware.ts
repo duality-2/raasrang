@@ -1,5 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  PERPETUAL_COOKIE_MAX_AGE,
+  getPersistentSessionFromCookies,
+} from '@/lib/session';
 
 /** Routes that scanner role CAN access */
 const SCANNER_ALLOWED_PATHS = [
@@ -49,6 +53,11 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      cookieOptions: {
+        maxAge: PERPETUAL_COOKIE_MAX_AGE,
+        path: '/',
+        sameSite: 'lax',
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -58,18 +67,56 @@ export async function middleware(request: NextRequest) {
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const isDelete = options?.maxAge === 0;
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              maxAge: isDelete ? 0 : PERPETUAL_COOKIE_MAX_AGE,
+              path: '/',
+              sameSite: 'lax',
+            });
+          });
         },
       },
     }
   );
 
-  // Refresh auth token
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Resilient user resolution — never kick active users out on load, network blip, or token refresh delay
+  let user: { id: string; email?: string; app_metadata: Record<string, unknown> } | null = null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data?.user) {
+      user = data.user;
+    }
+  } catch (err) {
+    console.warn('Middleware getUser error, checking fallback session:', err);
+  }
+
+  // Fallback 1: Check session directly from cookies (avoids failing on Supabase Auth API rate limit / 5xx)
+  if (!user) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        user = data.session.user;
+      }
+    } catch {
+      // Ignore and proceed to persistent session check
+    }
+  }
+
+  // Fallback 2: Check cryptographic persistent session cookie (fail-safe for high load/offline/idle)
+  if (!user) {
+    const persistent = await getPersistentSessionFromCookies(request.cookies);
+    if (persistent) {
+      user = {
+        id: persistent.userId,
+        email: persistent.email,
+        app_metadata: { role: persistent.role },
+      };
+    }
+  }
+
 
   const redirectWithCookies = (url: URL) => {
     const redirectResponse = NextResponse.redirect(url);
@@ -79,7 +126,7 @@ export async function middleware(request: NextRequest) {
     return redirectResponse;
   };
 
-  // Protected routes: redirect to /login if not authenticated
+  // Protected routes: redirect to /login ONLY if genuinely unauthenticated
   if (
     !user &&
     request.nextUrl.pathname.startsWith('/dashboard')

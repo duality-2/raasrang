@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserRole } from '@/lib/auth';
 import { generateTicketPdf } from '@/lib/pdf';
+import { getEventNights } from '@/actions/event-nights';
 import type { Pass } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -55,7 +56,7 @@ export async function GET(
 
   let night = null;
   if (p.ticket_type === 'single' && p.valid_night_id) {
-    const { data: nights } = await admin.from('event_nights').select('*');
+    const nights = await getEventNights();
     night = (nights || []).find(n => n.id === p.valid_night_id) || null;
   }
 

@@ -15,11 +15,23 @@ export interface EventNight {
   is_active: boolean;
 }
 
+let cachedEventNights: { data: EventNight[]; timestamp: number } | null = null;
+const SCHEDULE_CACHE_TTL_MS = 15 * 60 * 1000;
+
+export async function invalidateEventNightsCache() {
+  cachedEventNights = null;
+}
+
 /**
  * Fetch all configured event nights (Asia/Kolkata schedule).
  * Available to all authenticated staff members.
+ * Cached in-memory to eliminate ~60ms DB latency per ticket/PDF request.
  */
 export async function getEventNights(): Promise<EventNight[]> {
+  if (cachedEventNights && Date.now() - cachedEventNights.timestamp < SCHEDULE_CACHE_TTL_MS) {
+    return cachedEventNights.data;
+  }
+
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -28,12 +40,14 @@ export async function getEventNights(): Promise<EventNight[]> {
       .order('night_number', { ascending: true });
 
     if (error || !data) {
-      return [];
+      return cachedEventNights ? cachedEventNights.data : [];
     }
 
-    return data as EventNight[];
+    const nights = data as EventNight[];
+    cachedEventNights = { data: nights, timestamp: Date.now() };
+    return nights;
   } catch {
-    return [];
+    return cachedEventNights ? cachedEventNights.data : [];
   }
 }
 
@@ -76,6 +90,7 @@ export async function saveEventNightAction(formData: FormData) {
       return { success: false, error: error.message };
     }
 
+    invalidateEventNightsCache();
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/add');
     return { success: true };
@@ -112,6 +127,7 @@ export async function toggleEventNightStatus(id: string, isActive: boolean) {
       return { success: false, error: error.message };
     }
 
+    invalidateEventNightsCache();
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/admin');
     revalidatePath('/dashboard/verify');
@@ -153,6 +169,7 @@ export async function seedEventNights() {
       return { success: false, error: error.message };
     }
     
+    invalidateEventNightsCache();
     revalidatePath('/dashboard');
     revalidatePath('/dashboard/admin');
     revalidatePath('/dashboard/add');

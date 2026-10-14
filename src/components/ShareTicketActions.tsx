@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Pass } from '@/types';
 import { recordManualShareAction } from '@/actions/delivery';
 
@@ -16,11 +16,65 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
   const [isConfirming, setIsConfirming] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [isPdfReady, setIsPdfReady] = useState(false);
 
+  const prefetchedFileRef = useRef<File | null>(null);
+  const prefetchedUrlRef = useRef<string | null>(null);
+
+  const filename = `RaasRang-Ticket-${pass.manual_code}.pdf`;
+
+  // Lever 2: Pre-fetch PDF in background on mount for 0ms download / share
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasMounted(true);
-  }, []);
+
+    let isMounted = true;
+    const prefetchPdf = async () => {
+      try {
+        const res = await fetch(`/api/passes/${pass.id}/pdf`);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        if (!isMounted) return;
+        const file = new File([blob], filename, { type: 'application/pdf' });
+        prefetchedFileRef.current = file;
+        const url = URL.createObjectURL(blob);
+        prefetchedUrlRef.current = url;
+        setIsPdfReady(true);
+
+        // Check if navigated from "⚡ Issue & Open WhatsApp" auto-trigger
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const autoWa = params.get('autoWhatsapp');
+          if (autoWa === '1' || autoWa === 'download_only') {
+            // Auto-trigger download so PDF is directly in recent downloads to attach to WhatsApp
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            if (autoWa === '1') {
+              window.open(waUrl, '_blank');
+            }
+
+            setShareFeedback('⚡ Ticket issued & WhatsApp opened! Drag your downloaded PDF into the chat (or use "Share PDF ⚡" on mobile for auto-attach).');
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        }
+      } catch {
+        // Fallback: will fetch on-demand if background prefetch fails
+      }
+    };
+
+    prefetchPdf();
+
+    return () => {
+      isMounted = false;
+      if (prefetchedUrlRef.current) {
+        URL.revokeObjectURL(prefetchedUrlRef.current);
+      }
+    };
+  }, [pass.id, filename]);
 
   // Clean phone number for WhatsApp link
   const rawPhone = pass.phone?.replace(/[^0-9]/g, '') || '';
@@ -28,15 +82,33 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
     ? `https://wa.me/${rawPhone}?text=${encodeURIComponent(shareText)}`
     : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
-  const handleDeviceShare = async () => {
-    setShareFeedback('Preparing PDF...');
+  const handleDownloadPdf = () => {
     try {
-      const res = await fetch(`/api/passes/${pass.id}/pdf`);
-      const blob = await res.blob();
-      const file = new File([blob], `RaasRang-Ticket-${pass.manual_code}.pdf`, { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = prefetchedUrlRef.current || `/api/passes/${pass.id}/pdf`;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setShareFeedback('✓ PDF downloaded successfully.');
+    } catch {
+      setShareFeedback('Failed to download PDF.');
+    }
+  };
+
+  const handleDeviceShare = async () => {
+    try {
+      let file = prefetchedFileRef.current;
+      if (!file) {
+        setShareFeedback('Preparing PDF...');
+        const res = await fetch(`/api/passes/${pass.id}/pdf`);
+        const blob = await res.blob();
+        file = new File([blob], filename, { type: 'application/pdf' });
+      }
 
       const shareData = {
         title: 'RAAS RANG 2026 — Official Ticket',
+        text: shareText,
       };
 
       if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
@@ -54,19 +126,8 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
         return;
       }
       
-      // Fallback: If native share fails (e.g. async timeout in Safari, not supported, etc)
-      // Silently just download the PDF instead.
-      try {
-        const link = document.createElement('a');
-        link.href = `/api/passes/${pass.id}/pdf`;
-        link.download = `RaasRang-Ticket-${pass.manual_code}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setShareFeedback('PDF downloaded successfully.');
-      } catch {
-        setShareFeedback('Failed to download PDF.');
-      }
+      // Fallback: Silently just download the PDF instead.
+      handleDownloadPdf();
     }
   };
 
@@ -133,6 +194,30 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
           <span>Open WhatsApp</span>
         </a>
 
+        {/* Download PDF (Instant 0ms via prefetch) */}
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+          title={isPdfReady ? 'Instant download (pre-cached)' : 'Download Ticket PDF'}
+        >
+          <span>Download PDF{isPdfReady ? ' ⚡' : ''}</span>
+        </button>
+
+        {/* Device Native Share */}
+        {hasMounted && typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
+          <button
+            type="button"
+            onClick={handleDeviceShare}
+            className="btn btn-secondary btn-sm"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+            title={isPdfReady ? 'Instant share (pre-cached)' : 'Share PDF'}
+          >
+            <span>Share PDF{isPdfReady ? ' ⚡' : ''}</span>
+          </button>
+        )}
+
         {/* Copy Message */}
         <button
           type="button"
@@ -152,18 +237,6 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
         >
           <span>Share via Email</span>
         </button>
-
-        {/* Device Native Share */}
-        {hasMounted && typeof window !== 'undefined' && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
-          <button
-            type="button"
-            onClick={handleDeviceShare}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
-          >
-            <span>Share PDF</span>
-          </button>
-        )}
 
         {/* Delivery Status Badge */}
         <span

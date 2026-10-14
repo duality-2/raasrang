@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createPass } from '@/actions/passes';
 import { getEventNights, type EventNight } from '@/actions/event-nights';
-import type { TicketType } from '@/types';
+import type { TicketType, Pass } from '@/types';
+import { buildTicketMessage, buildWhatsAppUrl } from '@/lib/delivery-utils';
 
 export default function AddAttendeePage() {
   const router = useRouter();
@@ -16,6 +17,13 @@ export default function AddAttendeePage() {
 
   // Event nights schedule state
   const [eventNights, setEventNights] = useState<EventNight[]>([]);
+  const [selectedNightId, setSelectedNightId] = useState<string>('night_1');
+
+  // Attendee state
+  const [nameInput, setNameInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [lastIssuedPass, setLastIssuedPass] = useState<{ passId: string; name: string } | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Ticket configuration state
   const [ticketType, setTicketType] = useState<TicketType>('single');
@@ -28,6 +36,8 @@ export default function AddAttendeePage() {
   // Phone input state for +91 prefix restriction
   const [phoneInput, setPhoneInput] = useState('');
 
+  const submitModeRef = useRef<'standard' | 'whatsapp' | 'whatsapp_stay'>('whatsapp_stay');
+
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow digits, max 10
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
@@ -38,12 +48,15 @@ export default function AddAttendeePage() {
     getEventNights()
       .then((nights) => {
         setEventNights(nights);
+        if (nights.length > 0) {
+          setSelectedNightId(nights[0].id);
+        }
       })
       .catch(() => {});
   }, []);
 
-  // Client-side idempotency key generated once per form session
-  const [idempotencyKey] = useState<string>(() => {
+  // Client-side idempotency key generated once per form session, refreshed on fast-desk reset
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return 'pass_gen_' + crypto.randomUUID();
     }
@@ -51,15 +64,36 @@ export default function AddAttendeePage() {
   });
 
   async function handleSubmit(formData: FormData) {
+    const isStayMode = submitModeRef.current === 'whatsapp_stay';
+    const isWhatsAppMode = submitModeRef.current === 'whatsapp' || isStayMode;
+
+    if (isWhatsAppMode && !phoneInput.trim()) {
+      setError('Please provide a WhatsApp phone number to use instant WhatsApp sharing, or choose "Issue Ticket (View / Print Only)".');
+      return;
+    }
+
     setError(null);
     setFieldErrors({});
     setSuccess(false);
     setLoading(true);
 
+    // Pre-open blank tab synchronously in user click handler to satisfy browser popup blockers
+    let waWindow: Window | null = null;
+    if (isWhatsAppMode) {
+      try {
+        waWindow = window.open('about:blank', '_blank');
+      } catch {
+        waWindow = null;
+      }
+    }
+
     try {
       const result = await createPass(formData);
 
       if (result.error) {
+        if (waWindow && !waWindow.closed) {
+          waWindow.close();
+        }
         setError(result.error);
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
@@ -67,13 +101,88 @@ export default function AddAttendeePage() {
         return;
       }
 
-      if (result.success) {
-        setSuccess(true);
-        setTimeout(() => {
+      if (result.success && result.passId) {
+        if (isWhatsAppMode) {
+          const rawDigits = phoneInput.replace(/[^0-9]/g, '');
+          const formattedPhone = rawDigits.length === 10 ? `91${rawDigits}` : rawDigits;
+          const syntheticPass: Partial<Pass> = {
+            ticket_type: ticketType,
+            party_size: Number(partySize) || 1,
+          };
+          const selectedNight = eventNights.find((n) => n.id === selectedNightId) || null;
+          const shareText = buildTicketMessage(syntheticPass as Pass, selectedNight);
+          const waUrl = buildWhatsAppUrl(formattedPhone, shareText);
+
+          if (isStayMode) {
+            // Desk Fast-Mode: Uses Share PDF flow so WhatsApp receives the PDF directly attached
+            try {
+              const pdfRes = await fetch(`/api/passes/${result.passId}/pdf`);
+              const blob = await pdfRes.blob();
+              const file = new File([blob], `RaasRang-Ticket-${result.passId.slice(0, 8)}.pdf`, { type: 'application/pdf' });
+
+              if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+                if (waWindow && !waWindow.closed) {
+                  waWindow.close();
+                }
+                await navigator.share({
+                  title: 'RAAS RANG 2026 — Official Ticket',
+                  text: shareText,
+                  files: [file],
+                });
+              } else {
+                // Desktop fallback: Open WhatsApp chat and auto-download PDF
+                if (waWindow && !waWindow.closed) {
+                  waWindow.location.href = waUrl;
+                } else {
+                  window.open(waUrl, '_blank');
+                }
+                const downloadLink = document.createElement('a');
+                downloadLink.href = `/api/passes/${result.passId}/pdf`;
+                downloadLink.download = `RaasRang-Ticket-${result.passId.slice(0, 8)}.pdf`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+              }
+            } catch (shareErr: unknown) {
+              if (!(shareErr instanceof Error && shareErr.name === 'AbortError')) {
+                if (waWindow && !waWindow.closed) {
+                  waWindow.location.href = waUrl;
+                }
+              }
+            }
+
+            setLastIssuedPass({ passId: result.passId, name: nameInput.trim() || 'Attendee' });
+            setNameInput('');
+            setPhoneInput('');
+            setEmailInput('');
+            setAmountReceived('');
+            setPartySize(1);
+            setIdempotencyKey('pass_gen_' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)));
+
+            setTimeout(() => {
+              nameInputRef.current?.focus();
+            }, 100);
+            return;
+          }
+
+          // Standard WhatsApp redirect mode
+          setSuccess(true);
+          if (waWindow && !waWindow.closed) {
+            waWindow.location.href = waUrl;
+            router.push(`/dashboard/passes/${result.passId}?autoWhatsapp=download_only`);
+          } else {
+            router.push(`/dashboard/passes/${result.passId}?autoWhatsapp=1`);
+          }
+        } else {
+          setSuccess(true);
           router.push(`/dashboard/passes/${result.passId}`);
-        }, 1000);
+        }
       }
+
     } catch {
+      if (waWindow && !waWindow.closed) {
+        waWindow.close();
+      }
       setError('An unexpected error occurred while issuing the pass.');
     } finally {
       setLoading(false);
@@ -94,6 +203,37 @@ export default function AddAttendeePage() {
       </div>
 
       <div className="card" style={{ maxWidth: '640px' }}>
+        {lastIssuedPass && (
+          <div
+            className="alert alert-success"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+              padding: '12px 16px',
+              background: '#ecfdf5',
+              border: '1px solid #10b981',
+              borderRadius: '8px',
+            }}
+          >
+            <div>
+              <span style={{ fontWeight: 700, color: '#065f46' }}>✓ Ticket for {lastIssuedPass.name} issued!</span>
+              <div style={{ fontSize: '0.82rem', color: '#047857', marginTop: '2px' }}>
+                WhatsApp opened & PDF downloaded. Form is ready for next attendee.
+              </div>
+            </div>
+            <Link
+              href={`/dashboard/passes/${lastIssuedPass.passId}`}
+              target="_blank"
+              className="btn btn-secondary btn-sm"
+              style={{ fontSize: '0.8rem', whiteSpace: 'nowrap', fontWeight: 600 }}
+            >
+              View Ticket ↗
+            </Link>
+          </div>
+        )}
+
         {error && (
           <div className="alert alert-error">
             <span>{error}</span>
@@ -209,6 +349,8 @@ export default function AddAttendeePage() {
                 id="valid_night_id"
                 name="valid_night_id"
                 className="form-select"
+                value={selectedNightId}
+                onChange={(e) => setSelectedNightId(e.target.value)}
                 disabled={loading || success}
                 required
               >
@@ -234,12 +376,15 @@ export default function AddAttendeePage() {
             </label>
             <input
               id="name"
+              ref={nameInputRef}
               name="name"
               type="text"
               className={`form-input ${fieldErrors.name ? 'error' : ''}`}
               placeholder="e.g. Julie Saxena"
               required
               disabled={loading || success}
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
             />
             {fieldErrors.name && <div className="form-error">{fieldErrors.name}</div>}
           </div>
@@ -278,6 +423,8 @@ export default function AddAttendeePage() {
                 className={`form-input ${fieldErrors.email ? 'error' : ''}`}
                 placeholder="Optional"
                 disabled={loading || success}
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
               />
               {fieldErrors.email && <div className="form-error">{fieldErrors.email}</div>}
             </div>
@@ -334,22 +481,98 @@ export default function AddAttendeePage() {
             {fieldErrors.amount_received && <div className="form-error">{fieldErrors.amount_received}</div>}
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: '12px', padding: '14px', fontSize: '1.05rem', fontWeight: 700 }}
-            disabled={loading || success}
-          >
-            {loading ? (
-              <>
-                <span className="spinner" /> Generating Official Ticket…
-              </>
-            ) : success ? (
-              'Ticket Generated'
-            ) : (
-              'Issue Ticket & Generate PDF'
-            )}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+            {/* Primary Fast-Desk Action: Issue & Next Attendee */}
+            <button
+              type="submit"
+              onClick={() => {
+                submitModeRef.current = 'whatsapp_stay';
+              }}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '14px',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                background: '#15803d',
+                borderColor: '#166534',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: '0 2px 4px rgba(21, 128, 61, 0.3)',
+              }}
+              disabled={loading}
+            >
+              {loading && submitModeRef.current === 'whatsapp_stay' ? (
+                <>
+                  <span className="spinner" /> Issuing & Sharing PDF…
+                </>
+              ) : (
+                <>
+                  <span>⚡ Issue & Next Attendee (Share PDF Attached)</span>
+                </>
+              )}
+            </button>
+
+            {/* Direct WhatsApp Text Message: Issue & Open WhatsApp */}
+            <button
+              type="submit"
+              onClick={() => {
+                submitModeRef.current = 'whatsapp';
+              }}
+              className="btn btn-primary"
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '0.98rem',
+                fontWeight: 600,
+                background: '#16a34a',
+                borderColor: '#15803d',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+              disabled={loading}
+            >
+              {loading && submitModeRef.current === 'whatsapp' ? (
+                <>
+                  <span className="spinner" /> Generating & Opening WhatsApp…
+                </>
+              ) : (
+                <>
+                  <span>⚡ Issue & Open WhatsApp (Direct Message)</span>
+                </>
+              )}
+            </button>
+
+            {/* Standard Action: Issue & View Details */}
+            <button
+              type="submit"
+              onClick={() => {
+                submitModeRef.current = 'standard';
+              }}
+              className="btn btn-secondary"
+              style={{
+                width: '100%',
+                padding: '11px',
+                fontSize: '0.94rem',
+                fontWeight: 600,
+              }}
+              disabled={loading}
+            >
+              {loading && submitModeRef.current === 'standard' ? (
+                <>
+                  <span className="spinner" /> Generating Official Ticket…
+                </>
+              ) : (
+                'Issue Ticket (View / Print Only)'
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>

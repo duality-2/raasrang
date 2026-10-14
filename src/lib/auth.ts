@@ -1,20 +1,58 @@
 import { createClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getPersistentSessionFromCookies } from '@/lib/session';
 import type { UserRole } from '@/types';
 
 /**
- * Returns the authenticated user, or redirects to /login.
+ * Returns the authenticated user, or redirects to /login only if genuinely unauthenticated.
  * Call from Server Components and Server Actions.
+ * Resilient against high database load, network timeouts, and transient token refresh delays.
  */
 export async function requireAuth() {
   const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
 
-  if (error || !user) {
-    redirect('/login');
+  // 1. Primary check: Supabase auth getUser()
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (!error && user) {
+      return user;
+    }
+  } catch (err) {
+    console.warn('requireAuth: Supabase getUser() error, checking fallback session:', err);
   }
 
-  return user;
+  // 2. Fallback check: Direct session from cookies (survives Supabase Auth API rate limit / 5xx)
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      return session.user;
+    }
+  } catch (err) {
+    console.warn('requireAuth: Supabase getSession() error, checking persistent cookie:', err);
+  }
+
+  // 3. Fail-safe: Cryptographically verified perpetual session cookie (survives load, offline sleep, token expiry)
+  try {
+    const cookieStore = await cookies();
+    const persistent = await getPersistentSessionFromCookies(cookieStore);
+    if (persistent) {
+
+      return {
+        id: persistent.userId,
+        email: persistent.email,
+        app_metadata: { role: persistent.role },
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date(persistent.createdAt || Date.now()).toISOString(),
+      } as any;
+    }
+  } catch (err) {
+    console.warn('requireAuth: Persistent cookie check error:', err);
+  }
+
+  // 4. Genuinely unauthenticated (user never logged in, or explicitly signed out)
+  redirect('/login');
 }
 
 /**
@@ -23,20 +61,24 @@ export async function requireAuth() {
  * browser-accessible RLS policy (intentionally).
  */
 export async function isOrganiser(userId: string): Promise<boolean> {
-  const { createAdminClient } = await import('@/lib/supabase/admin');
-  const admin = createAdminClient();
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const admin = createAdminClient();
 
-  const { data, error } = await admin
-    .from('organisers')
-    .select('user_id')
-    .eq('user_id', userId)
-    .single();
+    const { data, error } = await admin
+      .from('organisers')
+      .select('user_id')
+      .eq('user_id', userId)
+      .single();
 
-  if (error || !data) {
+    if (error || !data) {
+      return false;
+    }
+
+    return true;
+  } catch {
     return false;
   }
-
-  return true;
 }
 
 /**
@@ -69,6 +111,7 @@ export async function getUserRole(userId: string, appMetadata?: Record<string, u
 
   return null;
 }
+
 
 /**
  * Require auth AND any recognized event staff role (admin, scanner, ticketer, organiser).
