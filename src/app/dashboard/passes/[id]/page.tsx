@@ -73,13 +73,25 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
             <h1 className="page-title">{displayName}</h1>
             <p className="page-subtitle">Pass Details & Physical Ticket</p>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+          <div className="page-header-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
             <span className={`badge badge-${p.status}`}>
               {STATUS_LABELS[p.status as PassStatus]}
             </span>
-            <ShareTicketActions pass={p} shareText={shareText} />
             <PrintTicketButton />
           </div>
+        </div>
+
+        {/* Share & Delivery Actions Toolbar */}
+        <div className="card mb-6 pass-actions-card">
+          <div className="card-header" style={{ marginBottom: '12px' }}>
+            <div>
+              <h2 className="card-title">Share & Delivery Actions</h2>
+              <p className="text-muted" style={{ fontSize: '0.85rem', margin: '2px 0 0' }}>
+                Instant delivery via WhatsApp, PDF download, or device share sheet
+              </p>
+            </div>
+          </div>
+          <ShareTicketActions pass={p} shareText={shareText} />
         </div>
 
         {/* Physical Ticket Preview Card */}
@@ -90,7 +102,7 @@ export default async function PassDetailPage({ params }: PassDetailPageProps) {
               Standard card layout for print and PDF export
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+          <div className="ticket-preview-wrapper" style={{ display: 'flex', justifyContent: 'center', padding: '16px 0', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <PhysicalTicketCard pass={p} night={night} />
           </div>
         </div>

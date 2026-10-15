@@ -21,27 +21,29 @@ export default async function AdminPage() {
   ]);
 
   return (
-    <div className="container" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-      <header style={{ marginBottom: '28px' }}>
-        <h1 style={{ fontSize: '1.85rem', fontWeight: 800, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>
-          ⚙️ Event Admin & Attendance Operations
-        </h1>
-        <p style={{ color: '#64748b', margin: 0, fontSize: '0.95rem' }}>
-          Official administrator dashboard for RAAS RANG 2026. Real-time footfall analytics, ticket party capacity, and day control.
-        </p>
-      </header>
-
+    <div className="page admin-page">
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div>
+          <h1 className="page-title">⚙️ Event Admin & Attendance Operations</h1>
+          <p className="page-subtitle">
+            Official administrator dashboard for RAAS RANG 2026. Real-time footfall analytics, ticket party capacity, and day control.
+          </p>
+        </div>
+      </div>
 
       {/* ── Real-Time Attendance Analytics & Capacity Visuals (Admin Profile Only) ── */}
-      <section style={{ marginBottom: '36px' }}>
+      <section style={{ marginBottom: '32px' }}>
         <AttendanceAnalytics initialData={metrics} />
       </section>
 
       {/* ── Event Nights & Day Activation Controls ── */}
-      <section className="card" style={{ marginBottom: '36px' }}>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 20px 0', borderBottom: '1px solid #eee', paddingBottom: '12px' }}>
-          🌟 Event Nights & Gate Day Activation
-        </h2>
+      <section className="card" style={{ marginBottom: '32px' }}>
+        <div className="card-header" style={{ marginBottom: '16px' }}>
+          <h2 className="card-title">🌟 Event Nights & Gate Day Activation</h2>
+          <span className="text-muted" style={{ fontSize: '0.85rem' }}>
+            Schedule controls & seasonal pass replenishment
+          </span>
+        </div>
         <EventNightControls nights={nights} />
       </section>
 

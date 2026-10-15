@@ -50,7 +50,49 @@ export default async function BatchesPage() {
         </div>
       ) : (
         <div className="card">
-          <div className="table-wrapper">
+          {/* Mobile Card View (< 768px) */}
+          <div className="batch-mobile-cards mobile-only">
+            {batchList.map((batch) => (
+              <div key={batch.id} className="batch-card">
+                <div className="batch-card-header">
+                  <div>
+                    <span className="batch-card-badge">Batch #{batch.batch_number}</span>
+                    <h3 className="batch-card-name">{batch.name}</h3>
+                  </div>
+                  <span className={`badge badge-${batch.category}`}>
+                    {CATEGORY_LABELS[batch.category as PassCategory]}
+                  </span>
+                </div>
+                <div className="batch-card-meta">
+                  <div className="batch-meta-item">
+                    <span className="batch-meta-label">Allocation</span>
+                    <span className="batch-meta-val">{batch.total_count} passes</span>
+                  </div>
+                  <div className="batch-meta-item">
+                    <span className="batch-meta-label">Created</span>
+                    <span className="batch-meta-val">{formatDate(batch.created_at)}</span>
+                  </div>
+                </div>
+                <div className="batch-card-actions">
+                  <Link
+                    href={`/dashboard/batches/${batch.id}`}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    View Passes
+                  </Link>
+                  <Link
+                    href={`/dashboard/batches/${batch.id}/print`}
+                    className="btn btn-primary btn-sm"
+                  >
+                    🖨 Print Batch
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table View (>= 768px) */}
+          <div className="table-wrapper desktop-only">
             <table className="data-table">
               <thead>
                 <tr>

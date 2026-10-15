@@ -282,6 +282,11 @@ export default function AttendanceAnalytics({ initialData }: AttendanceAnalytics
           </div>
         </div>
 
+        {/* Mobile scroll hint */}
+        <div className="chart-scroll-hint mobile-only">
+          <span>👈 Swipe horizontally to explore all 9 days & seasonal candles 👉</span>
+        </div>
+
         {/* SVG Interactive Chart with 10 Candles */}
         <div className="svg-chart-wrapper">
           <svg className="attendance-svg-chart" viewBox="0 0 1020 250" preserveAspectRatio="none">

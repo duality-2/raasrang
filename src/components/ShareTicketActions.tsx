@@ -179,35 +179,27 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
   const isAlreadySent = deliveryStatus === 'manually_shared' || deliveryStatus === 'sent' || deliveryStatus === 'delivered';
 
   return (
-    <div className="share-ticket-actions no-print" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
-
+    <div className="share-ticket-actions no-print">
+      <div className="share-actions-primary-row">
         {/* Open WhatsApp Web / Chat */}
         <a
           href={waUrl}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleWhatsAppClick}
-          className="btn btn-primary btn-sm fw-bold"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontWeight: 600,
-          }}
+          className="btn btn-whatsapp"
         >
-          <span>Open WhatsApp</span>
+          <span>💬 Open WhatsApp</span>
         </a>
 
         {/* Download PDF (Instant 0ms via prefetch) */}
         <button
           type="button"
           onClick={handleDownloadPdf}
-          className="btn btn-secondary btn-sm"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+          className="btn btn-secondary"
           title={isPdfReady ? 'Instant download (pre-cached)' : 'Download Ticket PDF'}
         >
-          <span>Download PDF{isPdfReady ? ' ⚡' : ''}</span>
+          <span>⚡ Download PDF</span>
         </button>
 
         {/* Device Native Share */}
@@ -215,83 +207,57 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
           <button
             type="button"
             onClick={handleDeviceShare}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+            className="btn btn-secondary"
             title={isPdfReady ? 'Instant share (pre-cached)' : 'Share PDF'}
           >
-            <span>Share PDF{isPdfReady ? ' ⚡' : ''}</span>
+            <span>📤 Share PDF</span>
           </button>
         )}
+      </div>
 
+      <div className="share-actions-secondary-row">
         {/* Copy Message */}
         <button
           type="button"
           onClick={handleCopyMessage}
-          className="btn btn-secondary btn-sm"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+          className="btn btn-ghost btn-sm"
         >
-          <span>Copy Message</span>
+          <span>📋 Copy Message</span>
         </button>
 
         {/* Share via Email */}
         <button
           type="button"
           onClick={handleEmailShare}
-          className="btn btn-secondary btn-sm"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+          className="btn btn-ghost btn-sm"
         >
-          <span>Share via Email</span>
+          <span>✉️ Share via Email</span>
         </button>
 
         {/* Delivery Status Badge */}
         <span
-          className={`badge badge-${deliveryStatus}`}
-          style={{
-            fontSize: '0.78rem',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            background: isAlreadySent ? '#166534' : '#e0e7ff',
-            color: isAlreadySent ? '#ffffff' : '#3730a3',
-            fontWeight: 600,
-          }}
+          className={`badge badge-${deliveryStatus} ${isAlreadySent ? 'badge-delivered' : 'badge-ready'}`}
         >
-          {isAlreadySent ? 'MANUALLY SHARED' : 'READY TO SHARE'}
+          {isAlreadySent ? '✓ MANUALLY SHARED' : '● READY TO SHARE'}
         </span>
       </div>
 
       {/* Human Explicit Confirmation Button / Next Attendee */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div className="share-actions-confirm-row">
         {!isAlreadySent ? (
           <button
             type="button"
             onClick={handleConfirmSent}
             disabled={isConfirming}
-            className="btn btn-primary btn-sm"
-            style={{
-              background: '#047857',
-              borderColor: '#047857',
-              color: '#ffffff',
-              fontSize: '0.82rem',
-              fontWeight: 600,
-            }}
+            className="btn btn-confirm-sent"
           >
-            {isConfirming ? 'Recording…' : 'Mark as Sent & Next Attendee'}
+            {isConfirming ? 'Recording…' : '✓ Mark as Sent & Next Attendee'}
           </button>
         ) : (
           <button
             type="button"
             onClick={() => router.push('/dashboard/add')}
-            className="btn btn-primary btn-sm"
-            style={{
-              background: '#15803d',
-              borderColor: '#166534',
-              color: '#ffffff',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
+            className="btn btn-next-attendee"
           >
             <span>+ Issue Next Attendee</span>
           </button>
@@ -299,7 +265,7 @@ export default function ShareTicketActions({ pass, shareText }: ShareTicketActio
       </div>
 
       {shareFeedback && (
-        <div style={{ fontSize: '0.82rem', color: '#047857', fontWeight: 600 }}>
+        <div className="share-feedback-pill">
           {shareFeedback}
         </div>
       )}

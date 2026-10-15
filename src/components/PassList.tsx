@@ -273,29 +273,52 @@ export default function PassList({ passes }: PassListProps) {
           {/* ── Mobile Card View ── */}
           <div className="table-wrap table-mobile">
             {paginatedPasses.map((pass) => (
-              <Link
-                key={pass.id}
-                href={`/dashboard/passes/${pass.id}`}
-                className="mobile-card"
-              >
-                <div className="mobile-card-header">
-                  <span className="mobile-card-name">
-                    {pass.name || 'Unassigned Ticket'}
-                  </span>
-                  <span className={`badge badge-${pass.status}`}>
-                    {STATUS_LABELS[pass.status as PassStatus]}
-                  </span>
+              <div key={pass.id} className="mobile-card">
+                <Link
+                  href={`/dashboard/passes/${pass.id}`}
+                  className="mobile-card-main-link"
+                >
+                  <div className="mobile-card-header">
+                    <span className="mobile-card-name">
+                      {pass.name || <span className="text-muted">Unassigned Ticket</span>}
+                    </span>
+                    <span className={`badge badge-${pass.status}`}>
+                      {STATUS_LABELS[pass.status as PassStatus]}
+                    </span>
+                  </div>
+                  <div className="mobile-card-meta">
+                    <span className={`badge badge-${pass.category}`}>
+                      {CATEGORY_LABELS[pass.category as PassCategory]}
+                    </span>
+                    <span className={`badge badge-${pass.delivery_status}`}>
+                      {DELIVERY_LABELS[pass.delivery_status as keyof typeof DELIVERY_LABELS] || 'Ready'}
+                    </span>
+                    <span className="mobile-card-date">{formatDate(pass.created_at)}</span>
+                  </div>
+                </Link>
+                <div className="mobile-card-footer">
+                  <div className="mobile-card-code-row">
+                    <code className="mobile-card-code">{pass.manual_code}</code>
+                    {pass.manual_code && (
+                      <button
+                        type="button"
+                        onClick={() => copyCode(pass.manual_code, pass.id)}
+                        className="mobile-card-copy-btn"
+                        title="Copy manual code"
+                        aria-label={`Copy code ${pass.manual_code}`}
+                      >
+                        {copiedId === pass.id ? '✓ Copied' : '📋 Copy'}
+                      </button>
+                    )}
+                  </div>
+                  <Link
+                    href={`/dashboard/passes/${pass.id}`}
+                    className="mobile-card-view-btn"
+                  >
+                    View →
+                  </Link>
                 </div>
-                <div className="mobile-card-meta">
-                  <code className="mobile-card-code">
-                    {pass.manual_code}
-                  </code>
-                  <span className={`badge badge-${pass.category}`}>
-                    {CATEGORY_LABELS[pass.category as PassCategory]}
-                  </span>
-                  <span className="mobile-card-date">{formatDate(pass.created_at)}</span>
-                </div>
-              </Link>
+              </div>
             ))}
           </div>
 

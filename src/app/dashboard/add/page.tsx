@@ -39,6 +39,7 @@ export default function AddAttendeePage() {
   const [phoneInput, setPhoneInput] = useState('');
 
   const submitModeRef = useRef<'standard' | 'whatsapp' | 'whatsapp_stay'>('whatsapp_stay');
+  const [submitMode, setSubmitMode] = useState<'standard' | 'whatsapp' | 'whatsapp_stay'>('whatsapp_stay');
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow digits, max 10
@@ -364,7 +365,21 @@ export default function AddAttendeePage() {
             {fieldErrors.party_size && (
               <div className="form-error">{fieldErrors.party_size}</div>
             )}
-            <div className="form-hint" style={{ marginTop: '4px' }}>
+            <div className="party-size-presets" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+              {[1, 2, 3, 4, 5, 10].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => setPartySize(num)}
+                  className={`btn btn-sm ${Number(partySize) === num ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ minWidth: '44px', padding: '6px 12px', fontSize: '0.84rem', fontWeight: 700, borderRadius: 'var(--radius-full)' }}
+                  disabled={loading || success}
+                >
+                  {num} {num === 1 ? 'person' : 'people'}
+                </button>
+              ))}
+            </div>
+            <div className="form-hint" style={{ marginTop: '6px' }}>
               {Number(partySize) === 1
                 ? 'Individual ticket (1 person)'
                 : `Group ticket: allows up to ${partySize || 1} people (max 100)${
@@ -523,37 +538,25 @@ export default function AddAttendeePage() {
             {fieldErrors.amount_received && <div className="form-error">{fieldErrors.amount_received}</div>}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
+          <div className="desk-action-buttons">
             {/* Primary Fast-Desk Action: Issue & Next Attendee */}
             <button
               type="submit"
               onClick={() => {
                 submitModeRef.current = 'whatsapp_stay';
+                setSubmitMode('whatsapp_stay');
               }}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '14px',
-                fontSize: '1.05rem',
-                fontWeight: 700,
-                background: '#15803d',
-                borderColor: '#166534',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                boxShadow: '0 2px 4px rgba(21, 128, 61, 0.3)',
-              }}
+              className="btn btn-desk-primary"
               disabled={loading}
             >
-              {loading && submitModeRef.current === 'whatsapp_stay' ? (
+              {loading && submitMode === 'whatsapp_stay' ? (
                 <>
-                  <span className="spinner" /> Issuing & Sharing PDF…
+                  <span className="spinner spinner-light" /> Issuing & Sharing PDF…
                 </>
               ) : (
                 <>
-                  <span>⚡ Issue & Next Attendee (Share PDF Attached)</span>
+                  <span className="btn-icon">⚡</span>
+                  <span>Issue & Next Attendee (Share PDF Attached)</span>
                 </>
               )}
             </button>
@@ -563,30 +566,19 @@ export default function AddAttendeePage() {
               type="submit"
               onClick={() => {
                 submitModeRef.current = 'whatsapp';
+                setSubmitMode('whatsapp');
               }}
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '12px',
-                fontSize: '0.98rem',
-                fontWeight: 600,
-                background: '#16a34a',
-                borderColor: '#15803d',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
+              className="btn btn-desk-secondary"
               disabled={loading}
             >
-              {loading && submitModeRef.current === 'whatsapp' ? (
+              {loading && submitMode === 'whatsapp' ? (
                 <>
-                  <span className="spinner" /> Generating & Opening WhatsApp…
+                  <span className="spinner spinner-light" /> Generating & Opening WhatsApp…
                 </>
               ) : (
                 <>
-                  <span>⚡ Issue & Open WhatsApp (Direct Message)</span>
+                  <span className="btn-icon">💬</span>
+                  <span>Issue & Open WhatsApp (Direct Message)</span>
                 </>
               )}
             </button>
@@ -596,17 +588,12 @@ export default function AddAttendeePage() {
               type="submit"
               onClick={() => {
                 submitModeRef.current = 'standard';
+                setSubmitMode('standard');
               }}
-              className="btn btn-secondary"
-              style={{
-                width: '100%',
-                padding: '11px',
-                fontSize: '0.94rem',
-                fontWeight: 600,
-              }}
+              className="btn btn-secondary btn-desk-view"
               disabled={loading}
             >
-              {loading && submitModeRef.current === 'standard' ? (
+              {loading && submitMode === 'standard' ? (
                 <>
                   <span className="spinner" /> Generating Official Ticket…
                 </>

@@ -52,42 +52,42 @@ export default function PassManagementActions({ passId, hasAdmissions, currentSt
   };
 
   return (
-    <div style={{ marginTop: '24px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
-      <h3 style={{ fontSize: '1.1rem', marginBottom: '12px' }}>Danger Zone</h3>
+    <div className="danger-zone-container">
+      <div className="danger-zone-header">
+        <span className="danger-zone-icon">⚠️</span>
+        <h3 className="danger-zone-title">Danger Zone</h3>
+      </div>
       
       {hasAdmissions ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '0.85rem', color: '#b91c1c', marginBottom: '8px' }}>
+        <div className="danger-zone-content">
+          <div className="danger-zone-note">
             <strong>Admission History Exists:</strong> This pass has already been used at the gate. It cannot be permanently deleted to preserve the audit trail. You may cancel it instead.
           </div>
           <button
             onClick={handleCancel}
             disabled={loading}
-            className="btn btn-secondary"
-            style={{ color: '#b91c1c', borderColor: '#fca5a5', alignSelf: 'flex-start' }}
+            className="btn btn-danger-outline"
           >
             {loading ? 'Processing...' : 'Cancel Pass'}
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '8px' }}>
-            This pass has no admission history. You can safely delete it from the system entirely, or just cancel it.
+        <div className="danger-zone-content">
+          <div className="danger-zone-note text-muted">
+            This pass has no admission history. You can safely delete it from the system entirely, or cancel it.
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div className="danger-zone-actions">
             <button
               onClick={handleCancel}
               disabled={loading}
-              className="btn btn-secondary"
-              style={{ color: '#b91c1c', borderColor: '#fca5a5' }}
+              className="btn btn-danger-outline"
             >
               {loading ? 'Processing...' : 'Cancel Pass'}
             </button>
             <button
               onClick={handleDelete}
               disabled={loading}
-              className="btn btn-primary"
-              style={{ background: '#b91c1c', borderColor: '#b91c1c' }}
+              className="btn btn-danger"
             >
               {loading ? 'Processing...' : 'Permanently Delete'}
             </button>

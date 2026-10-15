@@ -170,7 +170,15 @@ export default function Header({ email, userRole }: HeaderProps) {
               aria-current={pathname === '/dashboard' ? 'page' : undefined}
             >
               <span className="mobile-nav-icon">📋</span>
-              <span className="mobile-nav-text">Attendees</span>
+              <span className="mobile-nav-text">Passes</span>
+            </Link>
+            <Link
+              href="/dashboard/add"
+              className={`mobile-nav-item ${pathname === '/dashboard/add' ? 'active' : ''}`}
+              aria-current={pathname === '/dashboard/add' ? 'page' : undefined}
+            >
+              <span className="mobile-nav-icon">🎟️</span>
+              <span className="mobile-nav-text">Issue</span>
             </Link>
             <Link
               href="/dashboard/verify"
@@ -185,16 +193,16 @@ export default function Header({ email, userRole }: HeaderProps) {
               className={`mobile-nav-item ${pathname === '/dashboard/gate-list' ? 'active' : ''}`}
               aria-current={pathname === '/dashboard/gate-list' ? 'page' : undefined}
             >
-              <span className="mobile-nav-icon">📋</span>
+              <span className="mobile-nav-icon">📝</span>
               <span className="mobile-nav-text">Lists</span>
             </Link>
             <Link
-              href="/dashboard/batches"
-              className={`mobile-nav-item ${pathname.startsWith('/dashboard/batches') ? 'active' : ''}`}
-              aria-current={pathname.startsWith('/dashboard/batches') ? 'page' : undefined}
+              href="/dashboard/admin"
+              className={`mobile-nav-item ${pathname === '/dashboard/admin' ? 'active' : ''}`}
+              aria-current={pathname === '/dashboard/admin' ? 'page' : undefined}
             >
-              <span className="mobile-nav-icon">📦</span>
-              <span className="mobile-nav-text">Batches</span>
+              <span className="mobile-nav-icon">⚙️</span>
+              <span className="mobile-nav-text">Admin</span>
             </Link>
           </>
         )}

@@ -84,45 +84,80 @@ export default async function BatchDetailPage({ params }: BatchDetailPageProps) 
         {passesError ? (
           <div className="alert alert-error">Failed to load batch tickets</div>
         ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Attendee</th>
-                  <th>Manual Code</th>
-                  <th>Status</th>
-                  <th>Redeemed At</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {passList.map((p, idx) => (
-                  <tr key={p.id}>
-                    <td><strong>{idx + 1}</strong></td>
-                    <td>{p.name || 'Unassigned Ticket'}</td>
-                    <td>
-                      <code style={{ fontWeight: 700 }}>{p.manual_code}</code>
-                    </td>
-                    <td>
-                      <span className={`badge badge-${p.status}`}>
-                        {STATUS_LABELS[p.status as PassStatus]}
-                      </span>
-                    </td>
-                    <td>{p.used_at ? formatDate(p.used_at) : '—'}</td>
-                    <td>
-                      <Link
-                        href={`/dashboard/passes/${p.id}`}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Pass Details
-                      </Link>
-                    </td>
+          <>
+            {/* Mobile Ticket Cards (< 768px) */}
+            <div className="batch-pass-mobile-cards mobile-only">
+              {passList.map((p, idx) => (
+                <div key={p.id} className="batch-pass-card">
+                  <div className="batch-pass-top">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="batch-pass-num">#{idx + 1}</span>
+                      <strong className="batch-pass-name">{p.name || 'Unassigned Ticket'}</strong>
+                    </div>
+                    <span className={`badge badge-${p.status}`}>
+                      {STATUS_LABELS[p.status as PassStatus]}
+                    </span>
+                  </div>
+                  <div className="batch-pass-mid">
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>Manual Code:</span>
+                    <code className="batch-pass-code">{p.manual_code}</code>
+                  </div>
+                  <div className="batch-pass-bot">
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      {p.used_at ? `Redeemed ${formatDate(p.used_at)}` : 'Not yet redeemed'}
+                    </span>
+                    <Link
+                      href={`/dashboard/passes/${p.id}`}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      Details →
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= 768px) */}
+            <div className="table-wrapper desktop-only">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Attendee</th>
+                    <th>Manual Code</th>
+                    <th>Status</th>
+                    <th>Redeemed At</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {passList.map((p, idx) => (
+                    <tr key={p.id}>
+                      <td><strong>{idx + 1}</strong></td>
+                      <td>{p.name || 'Unassigned Ticket'}</td>
+                      <td>
+                        <code style={{ fontWeight: 700 }}>{p.manual_code}</code>
+                      </td>
+                      <td>
+                        <span className={`badge badge-${p.status}`}>
+                          {STATUS_LABELS[p.status as PassStatus]}
+                        </span>
+                      </td>
+                      <td>{p.used_at ? formatDate(p.used_at) : '—'}</td>
+                      <td>
+                        <Link
+                          href={`/dashboard/passes/${p.id}`}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Pass Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
